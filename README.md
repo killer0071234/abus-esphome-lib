@@ -93,7 +93,16 @@ on_...:
 
 ## Abhängigkeiten
 
-Damit diese Komponente kompilieren kann, werden die Hilfsfunktionen `ab_checkValidPacket`, `ab_getHeader` etc. benötigt. Diese müssen über die Header-Datei `abus_helper.h` zur Verfügung gestellt werden.
+Diese Komponente enthält alle benötigten Abhängigkeiten in der mitgelieferten Header-Datei [`abus_helper.h`](components/abus_socket/abus_helper.h). Diese stellt folgende wichtige Funktionen bereit:
+
+* **Paket-Validierung und -Parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`
+* **Paket-Erstellung**: `ab_setHeader`, `ab_setSocket`, `ab_calcCRC`
+* **Datentyp-Manipulation**: `ab_getBoolVal`, `ab_getIntVal`, `ab_getLongVal`, `ab_getRealVal`
+* **Socket-Strukturen**: `ab_header`, `ab_socket_config`, `ab_socket`
+
+Es sind keine zusätzlichen externen Abhängigkeiten erforderlich - alles was für die Cybro-3 Kommunikation benötigt wird, ist bereits enthalten.
+
+> ⚠️ **Wichtiger Hinweis**: Diese Komponente unterstützt aktuell nur das ESP-IDF Framework. Arduino Framework wird derzeit nicht unterstützt.
 
 ## Beispieldatei
 
@@ -129,6 +138,8 @@ Die Beispieldatei verwendet Socket-ID 1 und zeigt alle verfügbaren Funktionen d
 ## Repository
 
 Dieses Projekt ist auf GitHub verfügbar: [https://github.com/killer0071234/abus-esphome-lib](https://github.com/killer0071234/abus-esphome-lib)
+
+**Quelle**: Diese ESPHome-Komponente basiert auf der ursprünglichen ESP_ABUS Library: [https://github.com/killer0071234/esp_abus](https://github.com/killer0071234/esp_abus)
 
 ## Versioning
 
