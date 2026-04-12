@@ -2,3 +2,5 @@
 .pioenvs/
 .pio/
 *.pyc
+secrets.yaml
+*.log

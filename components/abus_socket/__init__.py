@@ -58,6 +58,7 @@ async def to_code(config):
             cv.Optional("reals"): cv.templatable(cv.ensure_list(cv.float_)),
         }
     ),
+    synchronous=True,
 )
 async def abus_send_data_to_code(config, action_id, template_arg, args):
     var = await cg.get_variable(config[CONF_ID])
