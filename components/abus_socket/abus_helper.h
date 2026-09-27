@@ -573,6 +573,19 @@ uint16_t ab_getValuesSize(const std::vector<ab_value> &values)
 }
 
 /**
+ * get the amount of bytes a layout of data types needs in the data buffer
+ * @param layout data types
+ * @return size in bytes
+ */
+uint16_t ab_getLayoutSize(const std::vector<ab_type> &layout)
+{
+    uint16_t size = 0;
+    for (ab_type type : layout)
+        size += ab_getTypeSize(type);
+    return size;
+}
+
+/**
  * add all tags into the data buffer, in the order of the list
  * @param data pointer to data buffer
  * @param datalen maximum data buffer length
@@ -615,6 +628,58 @@ void ab_setValues(char *data, size_t datalen, const std::vector<ab_value> &value
         pos += ab_getTypeSize(v.type);
         slotpos++;
     }
+}
+
+/**
+ * parse the tags of a received socket, in the order of the layout
+ * @param data pointer to data buffer
+ * @param datalen length of (received) data packet
+ * @param header header of the received packet
+ * @param layout data types in the order they are expected in the packet
+ * @param values parsed tags (output)
+ * @return true if the packet matches the layout
+ */
+bool ab_getValues(char *data, size_t datalen, const ab_header &header, const std::vector<ab_type> &layout, std::vector<ab_value> &values)
+{
+    uint16_t size = ab_getLayoutSize(layout);
+    if (header.len != size + 4u || datalen < header.len + 14u)
+    {
+        ESP_LOGW(TAG, "getValues()->socket %d: layout needs %d bytes of data, packet has %d", header.typ, size, header.len - 4);
+        return false;
+    }
+
+    values.clear();
+    values.reserve(layout.size());
+    uint16_t pos = 14;
+    uint8_t slotpos = 0;
+    for (ab_type type : layout)
+    {
+        ab_value v;
+        v.type = type;
+        switch (type)
+        {
+        case AB_BIT:
+            v.value = ab_getBoolVal(data, datalen, pos) ? 1.0 : 0.0;
+            ABUS_DBG_PRINTF(", b%d=%d", slotpos, v.value != 0.0);
+            break;
+        case AB_INT:
+            v.value = ab_getIntVal(data, datalen, pos);
+            ABUS_DBG_PRINTF(", i%d=%d", slotpos, (int)v.value);
+            break;
+        case AB_LONG:
+            v.value = ab_getLongVal(data, datalen, pos);
+            ABUS_DBG_PRINTF(", l%d=%" PRId32, slotpos, (int32_t)v.value);
+            break;
+        case AB_REAL:
+            v.value = ab_getRealVal(data, datalen, pos);
+            ABUS_DBG_PRINTF(", r%d=%.1f", slotpos, v.value);
+            break;
+        }
+        values.push_back(v);
+        pos += ab_getTypeSize(type);
+        slotpos++;
+    }
+    return true;
 }
 
 /**

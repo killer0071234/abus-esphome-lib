@@ -4,6 +4,7 @@
 #include "esphome/components/network/util.h"
 
 #include "esphome/core/automation.h"
+#include "esphome/core/defines.h"
 #include <vector>
 
 #include "esphome.h"
@@ -13,16 +14,52 @@
 #include <lwip/netdb.h>
 #include "abus_helper.h"
 #include "esp_netif.h"
+#ifdef USE_SENSOR
+#include "esphome/components/sensor/sensor.h"
+#endif
+#ifdef USE_BINARY_SENSOR
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#endif
 
 static const char *const TAGS = "abus";
 
 namespace abus_ns {
 
+    // A socket this component listens for, and the sensors its values are published to
+    struct ReceiveSocket {
+        uint8_t socket_id = 0;
+        std::vector<ab_type> layout;  // data types in the order they are expected in the packet
+#ifdef USE_SENSOR
+        std::vector<std::pair<uint8_t, esphome::sensor::Sensor *>> sensors;  // index in layout, sensor
+#endif
+#ifdef USE_BINARY_SENSOR
+        std::vector<std::pair<uint8_t, esphome::binary_sensor::BinarySensor *>> binary_sensors;
+#endif
+    };
+
     class abus_socket : public esphome::Component {
         protected:
             uint16_t port = 8442;
             int sock_ = -1;
-            ab_socket_config sock_cnf_rec;  // Socket config for receiving a socket
+            std::vector<ReceiveSocket> receive_sockets_;
+
+            ReceiveSocket *find_receive_socket_(uint8_t socket_id) {
+                for (auto &rs : this->receive_sockets_) {
+                    if (rs.socket_id == socket_id)
+                        return &rs;
+                }
+                return nullptr;
+            }
+
+            // The component and its sensors are set up in any order, so create the socket on first use
+            ReceiveSocket &get_or_add_receive_socket_(uint8_t socket_id) {
+                ReceiveSocket *rs = this->find_receive_socket_(socket_id);
+                if (rs != nullptr)
+                    return *rs;
+                this->receive_sockets_.emplace_back();
+                this->receive_sockets_.back().socket_id = socket_id;
+                return this->receive_sockets_.back();
+            }
         public:
         void loop() override {
             // 1. Check whether WiFi is connected
@@ -39,13 +76,20 @@ namespace abus_ns {
                 this->setup_socket();
             }
 
-            // 3. Regular receive code
+            // 3. Regular receive code: handle a few waiting packets per loop
             if (sock_ >= 0) {
                 char rx_buffer[128];
-                struct sockaddr_storage source_addr;
-                socklen_t socklen = sizeof(source_addr);
-                int len = recvfrom(sock_, rx_buffer, sizeof(rx_buffer), 0, (struct sockaddr *)&source_addr, &socklen);
-                if (len > 0) {
+                uint32_t own_address = this->get_own_address();
+                for (int i = 0; i < 8; i++) {
+                    struct sockaddr_storage source_addr;
+                    socklen_t socklen = sizeof(source_addr);
+                    int len = recvfrom(sock_, rx_buffer, sizeof(rx_buffer), 0, (struct sockaddr *)&source_addr, &socklen);
+                    if (len <= 0)
+                        break;
+                    // Ignore our own broadcasts
+                    auto *source = (struct sockaddr_in *)&source_addr;
+                    if (source->sin_family == AF_INET && source->sin_addr.s_addr == own_address)
+                        continue;
                     this->process_packet(rx_buffer, len);
                 }
             }
@@ -90,28 +134,72 @@ namespace abus_ns {
             }
         }
 
-        void set_socket_receive_config(uint8_t id, uint8_t num_bit, uint8_t num_int, uint8_t num_long, uint8_t num_real){
-            this->sock_cnf_rec.socket_id = id;
-            this->sock_cnf_rec.bitcount = num_bit;
-            this->sock_cnf_rec.intcount = num_int;
-            this->sock_cnf_rec.longcount = num_long;
-            this->sock_cnf_rec.realcount = num_real;
+        // Add the next data type to the layout of a receive socket
+        void add_receive_value(uint8_t socket_id, ab_type type) {
+            this->get_or_add_receive_socket_(socket_id).layout.push_back(type);
         }
 
+#ifdef USE_SENSOR
+        void add_sensor(uint8_t socket_id, uint8_t index, esphome::sensor::Sensor *sens) {
+            this->get_or_add_receive_socket_(socket_id).sensors.push_back({index, sens});
+        }
+#endif
+
+#ifdef USE_BINARY_SENSOR
+        void add_binary_sensor(uint8_t socket_id, uint8_t index, esphome::binary_sensor::BinarySensor *sens) {
+            this->get_or_add_receive_socket_(socket_id).binary_sensors.push_back({index, sens});
+        }
+#endif
+
+        void dump_config() override {
+            ESP_LOGCONFIG(TAGS, "ABUS Socket:");
+            ESP_LOGCONFIG(TAGS, "  Port: %d", this->port);
+            for (const auto &rs : this->receive_sockets_) {
+                ESP_LOGCONFIG(TAGS, "  Receive socket %d: %d values, %d bytes", rs.socket_id, (int)rs.layout.size(),
+                              ab_getLayoutSize(rs.layout));
+            }
+        }
 
         void process_packet(char* recbuf, size_t len) {
-            if (ab_checkValidPacket(recbuf, len))
-            {
-                ab_header header = ab_getHeader(recbuf, len);
-                // we got a socket message
-                if (header.dir == 1u && header.typ > 0u)
-                {
-                    //ESP_LOGD(TAGS, "<SOCK: ID: %3d: ", header.typ);
+            if (!ab_checkValidPacket(recbuf, len))
+                return;
+            ab_header header = ab_getHeader(recbuf, len);
+            // we only handle socket messages
+            if (header.dir != 1u || header.typ == 0u)
+                return;
 
-                    ab_socket sock = ab_getSocket(recbuf, len, header, this->sock_cnf_rec);
-                    // TODO: here we need the code to parse the received data
-                }
+            ReceiveSocket *rs = this->find_receive_socket_(header.typ);
+            if (rs == nullptr) {
+                ESP_LOGV(TAGS, "Ignoring socket %d from %" PRIu32 ": not configured", header.typ, header.from);
+                return;
             }
+
+            std::vector<ab_value> values;
+            if (!ab_getValues(recbuf, len, header, rs->layout, values))
+                return;
+            ESP_LOGD(TAGS, "Received socket %d from %" PRIu32 " with %d values", header.typ, header.from, (int)values.size());
+
+#ifdef USE_SENSOR
+            for (auto &entry : rs->sensors) {
+                if (entry.first < values.size())
+                    entry.second->publish_state((float)values[entry.first].value);
+            }
+#endif
+#ifdef USE_BINARY_SENSOR
+            for (auto &entry : rs->binary_sensors) {
+                if (entry.first < values.size())
+                    entry.second->publish_state(values[entry.first].value != 0.0);
+            }
+#endif
+        }
+
+        // Own IPv4 address (network byte order), 0 if not connected
+        uint32_t get_own_address() {
+            esp_netif_ip_info_t ip_info;
+            esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+            if (netif == nullptr || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK)
+                return 0;
+            return ip_info.ip.addr;
         }
 
         uint32_t get_subnet_broadcast_address() {

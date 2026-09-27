@@ -42,30 +42,60 @@ external_components:
 
 ## Konfiguration
 
-Füge den `abus_socket` Block zu deiner YAML-Datei hinzu, um die Komponente zu aktivieren und das Empfangs-Schema festzulegen:
+Füge den `abus_socket` Block zu deiner YAML-Datei hinzu, um die Komponente zu aktivieren und festzulegen, welche Sockets empfangen werden:
 
 ```yaml
 abus_socket:
   id: my_abus_socket
-  # Optional: Konfiguration für den Empfang von bestimmten Datentypen
+  # Optional: zu empfangende Sockets, ein Eintrag pro Socket
   socket_receive:
-    socket_id: 1
-    num_bit: 8
-    num_int: 2
-    num_long: 1
-    num_real: 1
+    # Freie Reihenfolge der Datentypen
+    - socket_id: 2
+      layout: [bit, real, bit, int, int, long, int]
+    # Feste Reihenfolge: zuerst alle Bits, dann Ints, Longs und Reals
+    - socket_id: 1
+      num_bit: 8
+      num_int: 2
+      num_long: 1
+      num_real: 1
 ```
 
 > 📋 **Vollständiges Beispiel**: Eine umfassende Konfiguration mit Sensoren, Schaltern und Automatisierungen finden Sie in [`example-esp32.yaml`](example-esp32.yaml).
 
 ### Konfigurationsvariablen:
 * **id** (*Optional*, ID): Die ID für diese Komponente. Wird benötigt, um aus Automatisierungen (Actions) darauf zuzugreifen.
-* **socket_receive** (*Optional*):
-  * **socket_id** (*Erforderlich*, int, templatable): Die zu lauschende Socket-ID.
-  * **num_bit** (*Optional*, int): Erwartete Anzahl der Bits/Bytes (Standard: 0).
-  * **num_int** (*Optional*, int): Erwartete Anzahl der 16-Bit Integer (Standard: 0).
-  * **num_long** (*Optional*, int): Erwartete Anzahl der 32-Bit Integer (Standard: 0).
-  * **num_real** (*Optional*, int): Erwartete Anzahl der Floats (Standard: 0).
+* **socket_receive** (*Optional*, Liste): Zu empfangende Sockets. Ein einzelner Eintrag ohne Liste wird ebenfalls akzeptiert. Jede `socket_id` darf nur einmal vorkommen.
+  * **socket_id** (*Erforderlich*, int 1–255): Die Socket-ID, auf die gelauscht wird.
+  * **layout** (*Optional*, Liste aus `bit`, `int`, `long`, `real`): Die Datentypen in der Reihenfolge, in der die Gegenstelle sie sendet.
+  * **num_bit** / **num_int** / **num_long** / **num_real** (*Optional*, int): Statt `layout`: die Anzahl der Bits, 16-Bit Integer, 32-Bit Integer und Floats, in dieser festen Reihenfolge. Kann nicht mit `layout` kombiniert werden.
+
+Pakete, deren Datenlänge nicht zum Layout passt, werden ignoriert und eine Warnung wird geloggt. Eigene Broadcasts des Geräts werden ignoriert. Ein Socket kann höchstens 110 Bytes Daten enthalten (bit = 1, int = 2, long und real = 4 Bytes).
+
+## Sensoren
+
+Jeder empfangene Wert kann auf einem eigenen Sensor veröffentlicht werden. `index` ist die Position des Werts im Socket, beginnend bei 0. Bei `num_*` zählt der Index zuerst durch alle Bits, dann durch die Ints, Longs und Reals.
+
+```yaml
+sensor:
+  - platform: abus_socket
+    name: "ABUS Temperatur"
+    socket_id: 2
+    index: 1          # der Real-Wert in [bit, real, bit, ...]
+    unit_of_measurement: "°C"
+
+binary_sensor:
+  - platform: abus_socket
+    name: "ABUS Alarm"
+    socket_id: 2
+    index: 0          # das erste Bit
+```
+
+* **socket_id** (*Erforderlich*, int): Ein unter `socket_receive` konfigurierter Socket.
+* **index** (*Erforderlich*, int): Position des Werts im Socket. `sensor` akzeptiert `int`-, `long`- und `real`-Werte, `binary_sensor` akzeptiert `bit`-Werte; die Konfigurationsprüfung meldet einen falschen Index oder Typ.
+* **abus_socket_id** (*Optional*, ID): Die `abus_socket` Komponente, nur nötig, wenn es mehrere gibt.
+* Alle weiteren Optionen von [Sensor](https://esphome.io/components/sensor/) bzw. [Binary Sensor](https://esphome.io/components/binary_sensor/), z. B. `name`, `unit_of_measurement` oder `filters`.
+
+Ein Sensor wird jedes Mal aktualisiert, wenn sein Socket empfangen wird.
 
 ## Actions
 
@@ -127,7 +157,7 @@ Ein Socket kann höchstens 109 Bytes Daten enthalten; größere Sockets werden n
 
 Diese Komponente enthält alle benötigten Abhängigkeiten in der mitgelieferten Header-Datei [`abus_helper.h`](components/abus_socket/abus_helper.h). Diese stellt folgende wichtige Funktionen bereit:
 
-* **Paket-Validierung und -Parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`
+* **Paket-Validierung und -Parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`, `ab_getValues`
 * **Paket-Erstellung**: `ab_setHeader`, `ab_setSocket`, `ab_setValues`, `ab_calcCRC`
 * **Datentyp-Manipulation**: `ab_getBoolVal`, `ab_getIntVal`, `ab_getLongVal`, `ab_getRealVal`
 * **Socket-Strukturen**: `ab_header`, `ab_socket_config`, `ab_socket`, `ab_value`
@@ -144,7 +174,7 @@ Eine vollständige Beispielkonfiguration finden Sie in [`example-esp32.yaml`](ex
 * WiFi-Setup mit manueller IP und Fallback-Hotspot
 * Integration mit Home Assistant über API
 * ABUS Socket Konfiguration mit allen Datentypen
-* Template-Sensoren für empfangene Daten
+* Sensoren und Binärsensoren für empfangene Daten
 * Schalter und Buttons für das Senden von Daten
 * Automatisierte zyklische Übertragung
 * Zeitbasierte Aktionen

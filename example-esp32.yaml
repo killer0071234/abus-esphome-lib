@@ -54,77 +54,118 @@ external_components:
 # ABUS Socket configuration
 abus_socket:
   id: my_abus_socket
-  # Receive configuration
+  # Receive configuration: one entry per socket
   socket_receive:
-    socket_id: 1
-    num_bit: 8    # receive 8 bits
-    num_int: 4    # receive 4 integers
-    num_long: 2   # receive 2 long values
-    num_real: 3   # receive 3 real values (floats)
+    # Fixed order (all bits, then ints, longs, reals):
+    # index 0-7 = bits, 8-11 = ints, 12-13 = longs, 14-16 = reals
+    - socket_id: 1
+      num_bit: 8    # receive 8 bits
+      num_int: 4    # receive 4 integers
+      num_long: 2   # receive 2 long values
+      num_real: 3   # receive 3 real values (floats)
 
-# Sensors for received data
+    # Free order of data types: index = position in the layout
+    - socket_id: 2
+      layout: [bit, real, bit, int, int, long, int]
+
+# Sensors for received data (int, long and real values)
 sensor:
   # Integer sensors (16-bit)
-  - platform: template
+  - platform: abus_socket
     name: "ABUS Int Value 1"
     id: abus_int_1
+    socket_id: 1
+    index: 8
     accuracy_decimals: 0
-    unit_of_measurement: ""
-    
-  - platform: template
-    name: "ABUS Int Value 2" 
+
+  - platform: abus_socket
+    name: "ABUS Int Value 2"
     id: abus_int_2
+    socket_id: 1
+    index: 9
     accuracy_decimals: 0
-    unit_of_measurement: ""
-    
+
   # Long sensors (32-bit)
-  - platform: template
+  - platform: abus_socket
     name: "ABUS Long Value 1"
     id: abus_long_1
+    socket_id: 1
+    index: 12
     accuracy_decimals: 0
-    unit_of_measurement: ""
-    
+
   # Real sensors (float)
-  - platform: template
+  - platform: abus_socket
     name: "ABUS Temperature"
     id: abus_temp
+    socket_id: 1
+    index: 14
     accuracy_decimals: 1
     unit_of_measurement: "°C"
     device_class: temperature
-    
-  - platform: template
+
+  - platform: abus_socket
     name: "ABUS Humidity"
     id: abus_humidity
+    socket_id: 1
+    index: 15
     accuracy_decimals: 1
     unit_of_measurement: "%"
     device_class: humidity
-    
-  - platform: template
+
+  - platform: abus_socket
     name: "ABUS Pressure"
     id: abus_pressure
+    socket_id: 1
+    index: 16
     accuracy_decimals: 2
     unit_of_measurement: "hPa"
     device_class: pressure
 
+  # Values of socket 2 (free order)
+  - platform: abus_socket
+    name: "ABUS Mixed Real"
+    socket_id: 2
+    index: 1
+    accuracy_decimals: 1
+
+  - platform: abus_socket
+    name: "ABUS Mixed Long"
+    socket_id: 2
+    index: 5
+    accuracy_decimals: 0
+
 # Binary sensors for bit values
 binary_sensor:
-  - platform: template
+  - platform: abus_socket
     name: "ABUS Bit 0"
     id: abus_bit_0
-    
-  - platform: template
+    socket_id: 1
+    index: 0
+
+  - platform: abus_socket
     name: "ABUS Bit 1"
     id: abus_bit_1
-    
-  - platform: template
+    socket_id: 1
+    index: 1
+
+  - platform: abus_socket
     name: "ABUS Alarm"
     id: abus_alarm
+    socket_id: 1
+    index: 2
     device_class: problem
-    
-  - platform: template
+
+  - platform: abus_socket
     name: "ABUS Status OK"
     id: abus_status_ok
+    socket_id: 1
+    index: 3
     device_class: connectivity
+
+  - platform: abus_socket
+    name: "ABUS Mixed Bit"
+    socket_id: 2
+    index: 0
 
 # Switches for outputs
 switch:

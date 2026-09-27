@@ -42,30 +42,60 @@ external_components:
 
 ## Configuration
 
-Add the `abus_socket` block to your YAML file to enable the component and define the receive schema:
+Add the `abus_socket` block to your YAML file to enable the component and define which sockets it receives:
 
 ```yaml
 abus_socket:
   id: my_abus_socket
-  # Optional: configuration for receiving specific data types
+  # Optional: sockets to receive, one entry per socket
   socket_receive:
-    socket_id: 1
-    num_bit: 8
-    num_int: 2
-    num_long: 1
-    num_real: 1
+    # Free order of data types
+    - socket_id: 2
+      layout: [bit, real, bit, int, int, long, int]
+    # Fixed order: all bits, then ints, longs and reals
+    - socket_id: 1
+      num_bit: 8
+      num_int: 2
+      num_long: 1
+      num_real: 1
 ```
 
 > 📋 **Full example**: A comprehensive configuration with sensors, switches and automations is available in [`example-esp32.yaml`](example-esp32.yaml).
 
 ### Configuration variables:
 * **id** (*Optional*, ID): The ID of this component. Required to access it from automations (actions).
-* **socket_receive** (*Optional*):
-  * **socket_id** (*Required*, int, templatable): The socket ID to listen on.
-  * **num_bit** (*Optional*, int): Expected number of bits/bytes (default: 0).
-  * **num_int** (*Optional*, int): Expected number of 16-bit integers (default: 0).
-  * **num_long** (*Optional*, int): Expected number of 32-bit integers (default: 0).
-  * **num_real** (*Optional*, int): Expected number of floats (default: 0).
+* **socket_receive** (*Optional*, list): Sockets to receive. A single entry without a list is accepted as well. Every `socket_id` may appear only once.
+  * **socket_id** (*Required*, int 1–255): The socket ID to listen for.
+  * **layout** (*Optional*, list of `bit`, `int`, `long`, `real`): The data types in the order they are sent by the counterpart.
+  * **num_bit** / **num_int** / **num_long** / **num_real** (*Optional*, int): Instead of `layout`: the number of bits, 16-bit integers, 32-bit integers and floats, in this fixed order. Cannot be combined with `layout`.
+
+Packets whose data length does not match the layout are ignored and a warning is logged. The device ignores its own broadcasts. A socket can contain at most 110 bytes of data (bit = 1, int = 2, long and real = 4 bytes).
+
+## Sensors
+
+Every received value can be published to its own sensor. `index` is the position of the value in the socket, starting at 0. With `num_*` the index counts through all bits first, then the ints, longs and reals.
+
+```yaml
+sensor:
+  - platform: abus_socket
+    name: "ABUS Temperature"
+    socket_id: 2
+    index: 1          # the real in [bit, real, bit, ...]
+    unit_of_measurement: "°C"
+
+binary_sensor:
+  - platform: abus_socket
+    name: "ABUS Alarm"
+    socket_id: 2
+    index: 0          # the first bit
+```
+
+* **socket_id** (*Required*, int): A socket configured under `socket_receive`.
+* **index** (*Required*, int): Position of the value in the socket. `sensor` accepts `int`, `long` and `real` values, `binary_sensor` accepts `bit` values; the configuration check reports a wrong index or type.
+* **abus_socket_id** (*Optional*, ID): The `abus_socket` component, only needed if there is more than one.
+* All other options of [sensor](https://esphome.io/components/sensor/) or [binary sensor](https://esphome.io/components/binary_sensor/), such as `name`, `unit_of_measurement` or `filters`.
+
+A sensor is updated every time its socket is received.
 
 ## Actions
 
@@ -127,7 +157,7 @@ A socket can carry at most 109 bytes of data; larger sockets are not sent and an
 
 This component ships all required dependencies in the bundled header file [`abus_helper.h`](components/abus_socket/abus_helper.h), which provides the following key functions:
 
-* **Packet validation and parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`
+* **Packet validation and parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`, `ab_getValues`
 * **Packet creation**: `ab_setHeader`, `ab_setSocket`, `ab_setValues`, `ab_calcCRC`
 * **Data type handling**: `ab_getBoolVal`, `ab_getIntVal`, `ab_getLongVal`, `ab_getRealVal`
 * **Socket structures**: `ab_header`, `ab_socket_config`, `ab_socket`, `ab_value`
@@ -144,7 +174,7 @@ A complete example configuration is available in [`example-esp32.yaml`](example-
 * WiFi setup with a static IP and fallback hotspot
 * Home Assistant integration via the API
 * ABUS socket configuration with all data types
-* Template sensors for received data
+* Sensors and binary sensors for received data
 * Switches and buttons for sending data
 * Automated cyclic transmission
 * Time-based actions

@@ -1,48 +1,18 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 import esphome.automation as automation
+import esphome.final_validate as fv
 from esphome.const import CONF_ID
 
 # Existing definitions
 abus_ns = cg.esphome_ns.namespace("abus_ns")
 abus_socket = abus_ns.class_("abus_socket", cg.Component)
 
-# Helper schema for the sub-configurations
-SOCKET_STRUCT_SCHEMA = cv.Schema(
-    {
-        cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
-        cv.Optional("num_bit", default=0): cv.int_,
-        cv.Optional("num_int", default=0): cv.int_,
-        cv.Optional("num_long", default=0): cv.int_,
-        cv.Optional("num_real", default=0): cv.int_,
-    }
-)
-
-CONFIG_SCHEMA = cv.COMPONENT_SCHEMA.extend(
-    {
-        cv.GenerateID(): cv.declare_id(abus_socket),
-        cv.Optional("socket_receive"): SOCKET_STRUCT_SCHEMA,
-    }
-)
-
-
-async def to_code(config):
-    var = cg.new_Pvariable(config[CONF_ID])
-    await cg.register_component(var, config)
-
-    # Pass the socket_receive values
-    if "socket_receive" in config:
-        recv_cfg = config["socket_receive"]
-        cg.add(
-            var.set_socket_receive_config(
-                recv_cfg["socket_id"],
-                recv_cfg["num_bit"],
-                recv_cfg["num_int"],
-                recv_cfg["num_long"],
-                recv_cfg["num_real"],
-            )
-        )
-
+CONF_ABUS_SOCKET_ID = "abus_socket_id"
+CONF_SOCKET_RECEIVE = "socket_receive"
+CONF_SOCKET_ID = "socket_id"
+CONF_LAYOUT = "layout"
+CONF_INDEX = "index"
 
 # Data types of a single socket tag
 ab_type = cg.global_ns.enum("ab_type")
@@ -52,6 +22,129 @@ VALUE_TYPES = {
     "long": (ab_type.AB_LONG, cv.int_range(min=-2147483648, max=2147483647)),
     "real": (ab_type.AB_REAL, cv.float_),
 }
+TYPE_SIZES = {"bit": 1, "int": 2, "long": 4, "real": 4}
+# A received packet may be at most 128 bytes: 14 bytes header, data, 2 bytes ts_id, 2 bytes crc
+MAX_RECEIVE_DATA_SIZE = 128 - 18
+
+# num_bit / num_int / num_long / num_real describe a layout in fixed order
+FIXED_ORDER_COUNTS = (
+    ("num_bit", "bit"),
+    ("num_int", "int"),
+    ("num_long", "long"),
+    ("num_real", "real"),
+)
+
+
+def build_receive_layout(config):
+    has_counts = any(key in config for key, _ in FIXED_ORDER_COUNTS)
+    if CONF_LAYOUT in config and has_counts:
+        raise cv.Invalid(
+            "'layout' cannot be combined with 'num_bit', 'num_int', 'num_long' or 'num_real'"
+        )
+    if CONF_LAYOUT not in config:
+        config[CONF_LAYOUT] = [
+            type_
+            for key, type_ in FIXED_ORDER_COUNTS
+            for _ in range(config.get(key, 0))
+        ]
+    if not config[CONF_LAYOUT]:
+        raise cv.Invalid("Socket needs a 'layout' with at least one data type")
+    size = sum(TYPE_SIZES[type_] for type_ in config[CONF_LAYOUT])
+    if size > MAX_RECEIVE_DATA_SIZE:
+        raise cv.Invalid(
+            f"Socket layout needs {size} bytes of data, maximum is {MAX_RECEIVE_DATA_SIZE}"
+        )
+    return config
+
+
+def validate_unique_socket_ids(sockets):
+    ids = [sock[CONF_SOCKET_ID] for sock in sockets]
+    for socket_id in ids:
+        if ids.count(socket_id) > 1:
+            raise cv.Invalid(f"socket_id {socket_id} is configured more than once")
+    return sockets
+
+
+SOCKET_RECEIVE_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.Required(CONF_SOCKET_ID): cv.int_range(min=1, max=255),
+            cv.Optional(CONF_LAYOUT): cv.ensure_list(
+                cv.one_of(*VALUE_TYPES, lower=True)
+            ),
+            **{
+                cv.Optional(key): cv.int_range(min=0, max=MAX_RECEIVE_DATA_SIZE)
+                for key, _ in FIXED_ORDER_COUNTS
+            },
+        }
+    ),
+    build_receive_layout,
+)
+
+CONFIG_SCHEMA = cv.COMPONENT_SCHEMA.extend(
+    {
+        cv.GenerateID(): cv.declare_id(abus_socket),
+        cv.Optional(CONF_SOCKET_RECEIVE): cv.All(
+            cv.ensure_list(SOCKET_RECEIVE_SCHEMA), validate_unique_socket_ids
+        ),
+    }
+)
+
+
+async def to_code(config):
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+
+    # Receive sockets: the data types in the order they are expected in the packet
+    for sock in config.get(CONF_SOCKET_RECEIVE, []):
+        for type_ in sock[CONF_LAYOUT]:
+            cg.add(var.add_receive_value(sock[CONF_SOCKET_ID], VALUE_TYPES[type_][0]))
+
+
+# Schema for sensor platforms that publish one value of a receive socket
+RECEIVE_VALUE_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(CONF_ABUS_SOCKET_ID): cv.use_id(abus_socket),
+        cv.Required(CONF_SOCKET_ID): cv.int_range(min=1, max=255),
+        cv.Required(CONF_INDEX): cv.int_range(min=0, max=MAX_RECEIVE_DATA_SIZE - 1),
+    }
+)
+
+
+def final_validate_receive_value(allowed_types):
+    """Check that socket_id and index point to a value of an allowed type."""
+
+    def validator(config):
+        full_config = fv.full_config.get()
+        path = full_config.get_path_for_id(config[CONF_ABUS_SOCKET_ID])[:-1]
+        parent = full_config.get_config_for_path(path)
+        sockets = {
+            sock[CONF_SOCKET_ID]: sock for sock in parent.get(CONF_SOCKET_RECEIVE, [])
+        }
+        socket_id = config[CONF_SOCKET_ID]
+        if socket_id not in sockets:
+            raise cv.Invalid(
+                f"socket_id {socket_id} is not configured under 'socket_receive'",
+                path=[CONF_SOCKET_ID],
+            )
+        layout = sockets[socket_id][CONF_LAYOUT]
+        index = config[CONF_INDEX]
+        if index >= len(layout):
+            raise cv.Invalid(
+                f"index {index} is out of range, socket {socket_id} has "
+                f"{len(layout)} values (index 0 to {len(layout) - 1})",
+                path=[CONF_INDEX],
+            )
+        if layout[index] not in allowed_types:
+            raise cv.Invalid(
+                f"index {index} of socket {socket_id} is a '{layout[index]}', "
+                f"expected {' or '.join(allowed_types)}",
+                path=[CONF_INDEX],
+            )
+        return config
+
+    return validator
+
 
 # One entry of the `values` list, e.g. `- real: 21.5`
 VALUE_SCHEMA = cv.All(
@@ -83,7 +176,7 @@ def validate_send_data(config):
         cv.Schema(
             {
                 cv.Required(CONF_ID): cv.use_id(abus_socket),
-                cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
+                cv.Required("socket_id"): cv.templatable(cv.int_range(min=1, max=255)),
                 cv.Optional("values"): cv.All(
                     cv.ensure_list(VALUE_SCHEMA), cv.Length(min=1)
                 ),
