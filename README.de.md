@@ -127,7 +127,6 @@ Eine vollständige Beispielkonfiguration finden Sie in [`example-esp32.yaml`](ex
    wifi_ssid: "Ihr-WiFi-Name"
    wifi_password: "Ihr-WiFi-Passwort"
    api_encryption_key: "32-Zeichen-Base64-Schlüssel"
-   ota_password: "sicheres-passwort"
    ```
 3. Kompilieren und flashen: 
    ```bash
