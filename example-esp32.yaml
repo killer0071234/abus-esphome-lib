@@ -11,32 +11,32 @@ esp32:
   framework:
     type: arduino
 
-# WiFi-Konfiguration
+# WiFi configuration
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   
-  # Manuelle IP optional
+  # Optional static IP
   manual_ip:
     static_ip: 192.168.1.100
     gateway: 192.168.1.1
     subnet: 255.255.255.0
   
-  # Fallback Hotspot
+  # Fallback hotspot
   ap:
     ssid: "${name} Fallback"
     password: "12345678"
 
 captive_portal:
 
-# API für Home Assistant
+# API for Home Assistant
 api:
   encryption:
     key: !secret api_encryption_key
 
 ota:
   - platform: esphome
-    # Nutzt den API-Encryption-Key
+    # Uses the API encryption key
     encryption:
       key: !secret api_encryption_key
 
@@ -44,27 +44,27 @@ ota:
 logger:
   level: DEBUG
 
-# External Components für ABUS Socket
+# External components for ABUS Socket
 external_components:
   - source:
       type: git
       url: https://github.com/killer0071234/abus-esphome-lib
       ref: main
 
-# ABUS Socket Konfiguration
+# ABUS Socket configuration
 abus_socket:
   id: my_abus_socket
-  # Empfangskonfiguration
+  # Receive configuration
   socket_receive:
     socket_id: 1
-    num_bit: 8    # 8 Bits empfangen
-    num_int: 4    # 4 Integer empfangen
-    num_long: 2   # 2 Long-Werte empfangen
-    num_real: 3   # 3 Real-Werte (Floats) empfangen
+    num_bit: 8    # receive 8 bits
+    num_int: 4    # receive 4 integers
+    num_long: 2   # receive 2 long values
+    num_real: 3   # receive 3 real values (floats)
 
-# Sensoren für empfangene Daten
+# Sensors for received data
 sensor:
-  # Integer-Sensoren (16-bit)
+  # Integer sensors (16-bit)
   - platform: template
     name: "ABUS Int Value 1"
     id: abus_int_1
@@ -77,14 +77,14 @@ sensor:
     accuracy_decimals: 0
     unit_of_measurement: ""
     
-  # Long-Sensoren (32-bit)
+  # Long sensors (32-bit)
   - platform: template
     name: "ABUS Long Value 1"
     id: abus_long_1
     accuracy_decimals: 0
     unit_of_measurement: ""
     
-  # Real-Sensoren (Float)
+  # Real sensors (float)
   - platform: template
     name: "ABUS Temperature"
     id: abus_temp
@@ -106,7 +106,7 @@ sensor:
     unit_of_measurement: "hPa"
     device_class: pressure
 
-# Binäre Sensoren für Bit-Werte
+# Binary sensors for bit values
 binary_sensor:
   - platform: template
     name: "ABUS Bit 0"
@@ -126,7 +126,7 @@ binary_sensor:
     id: abus_status_ok
     device_class: connectivity
 
-# Schalter für Ausgänge
+# Switches for outputs
 switch:
   - platform: template
     name: "ABUS Output 1"
@@ -135,12 +135,12 @@ switch:
       - abus_socket.send_data:
           id: my_abus_socket
           socket_id: 1
-          bits: [1, 0, 0, 0, 0, 0, 0, 0]  # Bit 0 auf 1 setzen
+          bits: [1, 0, 0, 0, 0, 0, 0, 0]  # set bit 0 to 1
     turn_off_action:
       - abus_socket.send_data:
           id: my_abus_socket
           socket_id: 1
-          bits: [0, 0, 0, 0, 0, 0, 0, 0]  # Bit 0 auf 0 setzen
+          bits: [0, 0, 0, 0, 0, 0, 0, 0]  # set bit 0 to 0
           
   - platform: template
     name: "ABUS Relay"
@@ -149,14 +149,14 @@ switch:
       - abus_socket.send_data:
           id: my_abus_socket
           socket_id: 1
-          bits: [0, 1, 0, 0, 0, 0, 0, 0]  # Bit 1 auf 1 setzen
+          bits: [0, 1, 0, 0, 0, 0, 0, 0]  # set bit 1 to 1
     turn_off_action:
       - abus_socket.send_data:
           id: my_abus_socket
           socket_id: 1
-          bits: [0, 0, 0, 0, 0, 0, 0, 0]  # Bit 1 auf 0 setzen
+          bits: [0, 0, 0, 0, 0, 0, 0, 0]  # set bit 1 to 0
 
-# Number-Komponente für Sollwerte
+# Number component for setpoints
 number:
   - platform: template
     name: "ABUS Setpoint Temperature"
@@ -172,9 +172,9 @@ number:
           id: my_abus_socket
           socket_id: 37
           reals: !lambda |-
-            return {x, 0.0, 0.0};  // x ist der eingestellte Wert
+            return {x, 0.0, 0.0};  // x is the selected value
 
-# Button für manuelle Aktionen
+# Buttons for manual actions
 button:
   - platform: template
     name: "Send ABUS Test Data"
@@ -200,16 +200,16 @@ button:
           longs: [0, 0]
           reals: [0.0, 0.0, 0.0]
 
-# Automatisierungen
+# Automations
 interval:
-  # Zyklisches Senden alle 30 Sekunden
+  # Send cyclically every 30 seconds
   - interval: 30s
     then:
       - abus_socket.send_data:
           id: my_abus_socket
           socket_id: 1
           bits: !lambda |-
-            // Dynamische Bit-Berechnung
+            // Compute bits dynamically
             std::vector<uint8_t> bits(8, 0);
             bits[0] = id(abus_output_1).state ? 1 : 0;
             bits[1] = id(abus_relay).state ? 1 : 0;
@@ -218,22 +218,22 @@ interval:
           longs: [12345, 67890]
           reals: !lambda |-
             return {
-              id(abus_setpoint_temp).state,  // Solltemperatur
-              (float)millis() / 1000.0f,     // Uptime in Sekunden
-              3.14159f                       // Konstanter Wert
+              id(abus_setpoint_temp).state,  // Setpoint temperature
+              (float)millis() / 1000.0f,     // Uptime in seconds
+              3.14159f                       // Constant value
             };
 
-# Time-Komponente für zeitbasierte Aktionen
+# Time component for time-based actions
 time:
   - platform: homeassistant
     id: homeassistant_time
     timezone: Europe/Berlin
     on_time:
-      # Jeden Tag um 12:00 Uhr
+      # Every day at 12:00
       - hours: 12
         minutes: 0
         then:
           - abus_socket.send_data:
               id: my_abus_socket
               socket_id: 1
-              bits: [1, 1, 1, 1, 0, 0, 0, 0]  # Mittags-Signal
+              bits: [1, 1, 1, 1, 0, 0, 0, 0]  # Noon signal

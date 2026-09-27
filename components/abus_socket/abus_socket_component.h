@@ -1,5 +1,5 @@
 #pragma once
-#include "esphome/core/component.h" // Das ist die wichtigste Zeile
+#include "esphome/core/component.h" // Component base class
 #include "esphome/core/log.h"
 #include "esphome/components/network/util.h"
 
@@ -26,7 +26,7 @@ namespace abus_ns {
             ab_socket send_storage_;
         public:
         void loop() override {
-            // 1. Prüfen, ob WiFi verbunden ist
+            // 1. Check whether WiFi is connected
             if (!esphome::network::is_connected()) {
                 if (sock_ != -1) {
                     close(sock_);
@@ -35,12 +35,12 @@ namespace abus_ns {
                 return; 
             }
 
-            // 2. Socket erst erstellen, wenn nötig
+            // 2. Create the socket only when needed
             if (sock_ < 0) {
                 this->setup_socket();
             }
 
-            // 3. Normaler Empfangs-Code
+            // 3. Regular receive code
             if (sock_ >= 0) {
                 char rx_buffer[128];
                 struct sockaddr_storage source_addr;
@@ -58,36 +58,36 @@ namespace abus_ns {
             dest_addr.sin_family = AF_INET;
             dest_addr.sin_port = htons(this->port);
 
-            // 1. Socket erstellen
+            // 1. Create the socket
             sock_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
             if (sock_ < 0) {
-                ESP_LOGE(TAGS, "Socket-Erstellung fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Socket creation failed: errno %d", errno);
                 return;
             }
 
-            // 2. Broadcast-Option aktivieren (Zwingend für Senden an 255.255.255.255)
+            // 2. Enable the broadcast option (required for sending to 255.255.255.255)
             int broadcast_enable = 1;
             if (setsockopt(sock_, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
-                ESP_LOGE(TAGS, "Konnte SO_BROADCAST nicht setzen: errno %d", errno);
+                ESP_LOGE(TAGS, "Could not set SO_BROADCAST: errno %d", errno);
                 close(sock_);
                 sock_ = -1;
                 return;
             }
 
-            // 3. Port-Wiederverwendung aktivieren (Verhindert "Address already in use" Fehler)
+            // 3. Enable port reuse (prevents "Address already in use" errors)
             int reuse = 1;
             setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
-            // 4. Auf non-blocking setzen
+            // 4. Switch to non-blocking mode
             fcntl(sock_, F_SETFL, O_NONBLOCK);
 
-            // 5. Bind ausführen
+            // 5. Bind
             if (bind(sock_, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-                ESP_LOGE(TAGS, "Bind fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Bind failed: errno %d", errno);
                 close(sock_);
                 sock_ = -1;
             } else {
-                ESP_LOGI(TAGS, "Socket erfolgreich für Broadcast an Port %d gebunden", this->port);
+                ESP_LOGI(TAGS, "Socket successfully bound for broadcast on port %d", this->port);
             }
         }
 
@@ -120,10 +120,10 @@ namespace abus_ns {
             esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
             
             if (netif == nullptr || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
-                return INADDR_BROADCAST; // Fallback auf 255.255.255.255
+                return INADDR_BROADCAST; // Fall back to 255.255.255.255
             }
 
-            // Berechnung: (IP OR (NOT Subnetzmaske))
+            // Calculation: (IP OR (NOT subnet mask))
             uint32_t ip = ip_info.ip.addr;
             uint32_t mask = ip_info.netmask.addr;
             return (ip | ~mask);
@@ -136,21 +136,21 @@ namespace abus_ns {
             dest_addr.sin_family = AF_INET;
             dest_addr.sin_port = htons(this->port);
             
-            // Dynamische Subnetz-Broadcast-Adresse verwenden
+            // Use the dynamic subnet broadcast address
             dest_addr.sin_addr.s_addr = this->get_subnet_broadcast_address();
 
             int err = sendto(this->sock_, data, len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
             
             if (err < 0) {
-                ESP_LOGE(TAGS, "Subnetz-Broadcast fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Subnet broadcast failed: errno %d", errno);
             } else {
                 char ip_str[16];
                 esp_ip4addr_ntoa((esp_ip4_addr_t*)&dest_addr.sin_addr.s_addr, ip_str, sizeof(ip_str));
-                ESP_LOGD(TAGS, "Gesendet an %s (%d bytes)", ip_str, len);
+                ESP_LOGD(TAGS, "Sent to %s (%d bytes)", ip_str, len);
             }
         }
 
-        // Setter für die Action (wird von SendDataAction aufgerufen)
+        // Setter for the action (called by SendDataAction)
         void set_send_data(int id, const std::vector<uint8_t> &bits, 
                         const std::vector<int16_t> &ints, 
                         const std::vector<int32_t> &longs, 
@@ -168,7 +168,7 @@ namespace abus_ns {
 
         void play_send() {
             if (!send_storage_.socket_valid) return;
-            // generate a the header
+            // generate the header
             ab_header header;
             header.dir = 1;
             header.typ = send_storage_.config.socket_id;
@@ -194,35 +194,35 @@ namespace abus_ns {
     };
 
 template<typename... Ts> 
-class SendDataAction : public esphome::Action<Ts...> { // <-- Sicherstellen, dass esphome:: davor steht
+class SendDataAction : public esphome::Action<Ts...> { // <-- make sure the esphome:: prefix is present
     public:
         explicit SendDataAction(abus_socket *parent) : parent_(parent) {}
 
-        // Templatable Setter (für Lambdas)
+        // Templatable setters (for lambdas)
         void set_socket_id(esphome::TemplatableValue<int, Ts...> v) { socket_id_v_ = v; }
         void set_bits(esphome::TemplatableValue<std::vector<uint8_t>, Ts...> v) { bit_v_ = v; }
         void set_ints(esphome::TemplatableValue<std::vector<int16_t>, Ts...> v) { int_v_ = v; }
         void set_longs(esphome::TemplatableValue<std::vector<int32_t>, Ts...> v) { long_v_ = v; }
         void set_reals(esphome::TemplatableValue<std::vector<float>, Ts...> v) { real_v_ = v; }
 
-        // Statische Setter (für {1, 2, 3})
+        // Static setters (for {1, 2, 3})
         void set_socket_id_static(int v) { socket_id_v_ = v; }
         void set_bits_static(const std::vector<uint8_t> &v) { bit_v_ = v; }
         void set_ints_static(const std::vector<int16_t> &v) { int_v_ = v; }
         void set_longs_static(const std::vector<int32_t> &v) { long_v_ = v; }
         void set_reals_static(const std::vector<float> &v) { real_v_ = v; }
         void play(const Ts &...x) override {
-            // 1. Alle Werte aus den Templates extrahieren
+            // 1. Extract all values from the templates
             int s_id = this->socket_id_v_.value(x...);
             auto bits = this->bit_v_.value(x...);
             auto ints = this->int_v_.value(x...);
             auto longs = this->long_v_.value(x...);
             auto reals = this->real_v_.value(x...);
 
-            // 2. In den zentralen ab_socket Speicher der Komponente schreiben
+            // 2. Write them into the component's central ab_socket storage
             this->parent_->set_send_data(s_id, bits, ints, longs, reals);
 
-            // 3. Den Sendevorgang auslösen
+            // 3. Trigger the send
             this->parent_->play_send();
         }
 
