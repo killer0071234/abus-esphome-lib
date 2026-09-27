@@ -564,9 +564,9 @@ uint8_t ab_getTypeSize(ab_type type)
  * @param values list of tags
  * @return size in bytes
  */
-uint16_t ab_getValuesSize(const std::vector<ab_value> &values)
+size_t ab_getValuesSize(const std::vector<ab_value> &values)
 {
-    uint16_t size = 0;
+    size_t size = 0;
     for (const ab_value &v : values)
         size += ab_getTypeSize(v.type);
     return size;
@@ -580,7 +580,7 @@ uint16_t ab_getValuesSize(const std::vector<ab_value> &values)
  */
 void ab_setValues(char *data, size_t datalen, const std::vector<ab_value> &values)
 {
-    uint16_t pos = 14;
+    size_t pos = 14;
     uint8_t slotpos = 0;
     for (const ab_value &v : values)
     {

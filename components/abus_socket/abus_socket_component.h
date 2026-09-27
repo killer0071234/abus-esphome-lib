@@ -151,20 +151,23 @@ namespace abus_ns {
 
         // Build a socket packet from the tags (in list order) and broadcast it
         void send_values(uint8_t socket_id, const std::vector<ab_value> &values) {
+            const size_t values_size = ab_getValuesSize(values);
+
+            char sendbuf[128];
+            if (values_size > static_cast<size_t>(UINT16_MAX - 4) || values_size + 18u > sizeof(sendbuf)) {
+                ESP_LOGE(TAGS, "Socket %d is too large: %d bytes of data, maximum is %d", socket_id,
+                         (int)values_size, (int)sizeof(sendbuf) - 19);
+                return;
+            }
+
             ab_header header;
             header.dir = 1;
             header.typ = socket_id;
             header.from = 1234;
             header.to = 0;
-            header.len = ab_getValuesSize(values) + 4;
+            header.len = static_cast<uint16_t>(values_size + 4u);
 
             // generate dataarray
-            char sendbuf[128];
-            if (header.len + 14u >= sizeof(sendbuf)) {
-                ESP_LOGE(TAGS, "Socket %d is too large: %d bytes of data, maximum is %d", socket_id,
-                         header.len - 4, (int)sizeof(sendbuf) - 19);
-                return;
-            }
             ESP_LOGD(TAGS, "Sending socket %d with %d values", socket_id, (int)values.size());
             ab_setHeader(sendbuf, sizeof(sendbuf), header);
             // set socket data into it
