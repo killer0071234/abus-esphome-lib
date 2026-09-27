@@ -38,6 +38,7 @@ ota:
   - platform: esphome
     # Nutzt den API-Encryption-Key
     encryption:
+      key: !secret api_encryption_key
 
 # Logging
 logger:
