@@ -69,7 +69,7 @@ abus_socket:
   * **layout** (*Optional*, list of `bit`, `int`, `long`, `real`): The data types in the order they are sent by the counterpart.
   * **num_bit** / **num_int** / **num_long** / **num_real** (*Optional*, int): Instead of `layout`: the number of bits, 16-bit integers, 32-bit integers and floats, in this fixed order. Cannot be combined with `layout`.
 
-Packets whose data length does not match the layout are ignored and a warning is logged. The device ignores its own broadcasts. A socket can contain at most 110 bytes of data (bit = 1, int = 2, long and real = 4 bytes).
+Packets whose data length does not match the layout are ignored and a warning is logged. The device ignores its own broadcasts. Received sockets can contain at most 110 bytes of data (bit = 1, int = 2, long and real = 4 bytes); sent sockets can carry at most 109 bytes.
 
 ## Sensors
 

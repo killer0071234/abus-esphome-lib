@@ -125,8 +125,8 @@ int16_t ab_getIntVal(char *data, size_t len, uint16_t pos)
     int16_t retval = 0;
     if (len >= pos + 1u)
     {
-        retval = data[pos];
-        retval += data[pos + 1] << 8;
+        retval = static_cast<uint8_t>(data[pos]);
+        retval += static_cast<uint8_t>(data[pos + 1]) << 8;
     }
     return retval;
 }
@@ -161,10 +161,10 @@ int32_t ab_getLongVal(char *data, size_t len, uint16_t pos)
     int32_t retval = 0;
     if (len >= pos + 3u)
     {
-        retval = data[pos];
-        retval += data[pos + 1] << 8;
-        retval += data[pos + 2] << 16;
-        retval += data[pos + 3] << 24;
+        retval = static_cast<uint8_t>(data[pos]);
+        retval += static_cast<uint8_t>(data[pos + 1]) << 8;
+        retval += static_cast<uint8_t>(data[pos + 2]) << 16;
+        retval += static_cast<uint8_t>(data[pos + 3]) << 24;
     }
     return retval;
 }
