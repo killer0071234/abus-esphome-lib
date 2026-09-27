@@ -3,11 +3,11 @@ import esphome.config_validation as cv
 import esphome.automation as automation
 from esphome.const import CONF_ID
 
-# Vorhandene Definitionen
+# Existing definitions
 abus_ns = cg.esphome_ns.namespace("abus_ns")
 abus_socket = abus_ns.class_("abus_socket", cg.Component)
 
-# Hilfs-Schema für die Sub-Konfigurationen
+# Helper schema for the sub-configurations
 SOCKET_STRUCT_SCHEMA = cv.Schema(
     {
         cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
@@ -30,7 +30,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Werte für socket_receive übergeben
+    # Pass the socket_receive values
     if "socket_receive" in config:
         recv_cfg = config["socket_receive"]
         cg.add(
@@ -44,7 +44,7 @@ async def to_code(config):
         )
 
 
-# Registrierung der Action
+# Action registration
 @automation.register_action(
     "abus_socket.send_data",
     abus_ns.class_("SendDataAction", automation.Action),
@@ -86,7 +86,7 @@ async def abus_send_data_to_code(config, action_id, template_arg, args):
                 )
                 cg.add(getattr(rhs, f"set_{setter}")(template_))
             else:
-                # WICHTIG: Explizites Casting in einen std_vector für den C++ Code
+                # IMPORTANT: explicit cast to std_vector for the C++ code
                 vector_data = cg.std_vector.template(cg_type)(value)
                 cg.add(getattr(rhs, f"set_{setter}_static")(vector_data))
 
