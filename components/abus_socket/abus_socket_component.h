@@ -154,9 +154,9 @@ namespace abus_ns {
             const size_t values_size = ab_getValuesSize(values);
 
             char sendbuf[128];
-            if (values_size > static_cast<size_t>(UINT16_MAX - 4) || values_size + 18u >= sizeof(sendbuf)) {
+            if (values_size > static_cast<size_t>(UINT16_MAX - 4) || values_size + 18u > sizeof(sendbuf)) {
                 ESP_LOGE(TAGS, "Socket %d is too large: %d bytes of data, maximum is %d", socket_id,
-                         (int)values_size, (int)sizeof(sendbuf) - 19);
+                         (int)values_size, (int)sizeof(sendbuf) - 18);
                 return;
             }
 

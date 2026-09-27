@@ -372,7 +372,7 @@ ab_header ab_getHeader(char *data, size_t datalen)
  */
 void ab_setHeader(char *data, size_t len, ab_header header)
 {
-    if (len > header.len + 14u)
+    if (len >= header.len + 14u)
     {
         ABUS_DBG_PRINTF("*AB: setHeader()->len=%d, from=%" PRIu32 ", to=%" PRIu32 "\n", header.len, header.from, header.to);
         data[0] = 0xAA;
