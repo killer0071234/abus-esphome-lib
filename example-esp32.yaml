@@ -1,6 +1,10 @@
-esphome:
+substitutions:
   name: abus-socket-example
   friendly_name: "ABUS Socket ESP32 Example"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
 
 esp32:
   board: nodemcu-32s
@@ -20,7 +24,7 @@ wifi:
   
   # Fallback Hotspot
   ap:
-    ssid: "${friendly_name} Fallback"
+    ssid: "${name} Fallback"
     password: "12345678"
 
 captive_portal:
@@ -32,7 +36,9 @@ api:
 
 ota:
   - platform: esphome
-    password: !secret ota_password
+    # Nutzt den API-Encryption-Key
+    encryption:
+      key: !secret api_encryption_key
 
 # Logging
 logger:
@@ -213,8 +219,8 @@ interval:
           reals: !lambda |-
             return {
               id(abus_setpoint_temp).state,  // Solltemperatur
-              (float)millis() / 1000.0,      // Uptime in Sekunden
-              3.14159                        // Konstanter Wert
+              (float)millis() / 1000.0f,     // Uptime in Sekunden
+              3.14159f                       // Konstanter Wert
             };
 
 # Time-Komponente für zeitbasierte Aktionen
