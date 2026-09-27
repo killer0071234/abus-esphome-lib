@@ -19,6 +19,7 @@ static const char *const TAG = "abus_helper";
 #include <vector>
 // Including standard types
 #include <cstdint>
+#include <cinttypes>
 typedef uint8_t byte;
 #include <cmath>
 
@@ -372,7 +373,7 @@ void ab_setHeader(char *data, size_t len, ab_header header)
 {
     if (len > header.len + 14u)
     {
-        ABUS_DBG_PRINTF("*AB: setHeader()->len=%d, from=%u, to=%u\n", header.len, header.from, header.to);
+        ABUS_DBG_PRINTF("*AB: setHeader()->len=%d, from=%" PRIu32 ", to=%" PRIu32 "\n", header.len, header.from, header.to);
         data[0] = 0xAA;
         data[1] = 0x55;
         ab_setUIntVal(data, len, 2, header.len);
@@ -405,7 +406,7 @@ ab_socket ab_getSocket(char *data, size_t datalen, ab_header &header, uint8_t so
         //read the socket id
         retval.config.socket_id = header.typ;
         retval.sender = header.from;
-        ESP_LOGI(TAG, "getSocket()->id=%d, sender=%u, header.len=%d", retval.config.socket_id, retval.sender, header.len);
+        ESP_LOGI(TAG, "getSocket()->id=%d, sender=%" PRIu32 ", header.len=%d", retval.config.socket_id, retval.sender, header.len);
         uint16_t pos = 14;
         // check for valid length of data block
         uint16_t len_count = bitcount + intcount * 2 + longcount * 4 + realcount * 4 + 4;
@@ -440,7 +441,7 @@ ab_socket ab_getSocket(char *data, size_t datalen, ab_header &header, uint8_t so
         {
             //retval.longdata.push_back(ab_getLongVal(data, datalen, pos));
             retval.longdata[slotpos] = ab_getLongVal(data, datalen, pos);
-            ABUS_DBG_PRINTF(", i%d=%d", slotpos, retval.longdata[slotpos]);
+            ABUS_DBG_PRINTF(", l%d=%" PRId32, slotpos, retval.longdata[slotpos]);
             pos += 4;
             slotpos++;
         }
@@ -485,7 +486,7 @@ ab_socket ab_getSocket(char *data, size_t datalen, ab_header &header, ab_socket_
  */
 void ab_setSocket(char *data, size_t datalen, ab_socket socket)
 {
-    ESP_LOGI(TAG, "setSocket()->id=%d, sender=%d", socket.config.socket_id, socket.sender);
+    ESP_LOGI(TAG, "setSocket()->id=%d, sender=%" PRIu32, socket.config.socket_id, socket.sender);
     uint16_t pos = 14;
     uint8_t slotpos = 0;
     while (socket.bitdata.size() > slotpos)
@@ -506,7 +507,7 @@ void ab_setSocket(char *data, size_t datalen, ab_socket socket)
     slotpos = 0;
     while (socket.longdata.size() > slotpos)
     {
-        ABUS_DBG_PRINTF(", l%d=%d", slotpos, socket.longdata[slotpos]);
+        ABUS_DBG_PRINTF(", l%d=%" PRId32, slotpos, socket.longdata[slotpos]);
         ab_setLongVal(data, datalen, pos, socket.longdata[slotpos]);
         pos += 4;
         slotpos++;
@@ -519,7 +520,6 @@ void ab_setSocket(char *data, size_t datalen, ab_socket socket)
         pos += 4;
         slotpos++;
     }
-    ABUS_DBG_PRINTLN("");
 }
 
 /**

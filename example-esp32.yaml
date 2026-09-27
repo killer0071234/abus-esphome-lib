@@ -213,8 +213,8 @@ interval:
           reals: !lambda |-
             return {
               id(abus_setpoint_temp).state,  // Solltemperatur
-              (float)millis() / 1000.0,      // Uptime in Sekunden
-              3.14159                        // Konstanter Wert
+              (float)millis() / 1000.0f,     // Uptime in Sekunden
+              3.14159f                       // Konstanter Wert
             };
 
 # Time-Komponente für zeitbasierte Aktionen
