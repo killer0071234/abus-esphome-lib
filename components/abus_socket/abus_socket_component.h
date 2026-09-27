@@ -61,14 +61,14 @@ namespace abus_ns {
             // 1. Socket erstellen
             sock_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
             if (sock_ < 0) {
-                ESP_LOGE(TAGS, "Socket-Erstellung fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Socket creation failed: errno %d", errno);
                 return;
             }
 
             // 2. Broadcast-Option aktivieren (Zwingend für Senden an 255.255.255.255)
             int broadcast_enable = 1;
             if (setsockopt(sock_, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
-                ESP_LOGE(TAGS, "Konnte SO_BROADCAST nicht setzen: errno %d", errno);
+                ESP_LOGE(TAGS, "Could not set SO_BROADCAST: errno %d", errno);
                 close(sock_);
                 sock_ = -1;
                 return;
@@ -83,11 +83,11 @@ namespace abus_ns {
 
             // 5. Bind ausführen
             if (bind(sock_, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-                ESP_LOGE(TAGS, "Bind fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Bind failed: errno %d", errno);
                 close(sock_);
                 sock_ = -1;
             } else {
-                ESP_LOGI(TAGS, "Socket erfolgreich für Broadcast an Port %d gebunden", this->port);
+                ESP_LOGI(TAGS, "Socket successfully bound for broadcast on port %d", this->port);
             }
         }
 
@@ -142,11 +142,11 @@ namespace abus_ns {
             int err = sendto(this->sock_, data, len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
             
             if (err < 0) {
-                ESP_LOGE(TAGS, "Subnetz-Broadcast fehlgeschlagen: errno %d", errno);
+                ESP_LOGE(TAGS, "Subnet broadcast failed: errno %d", errno);
             } else {
                 char ip_str[16];
                 esp_ip4addr_ntoa((esp_ip4_addr_t*)&dest_addr.sin_addr.s_addr, ip_str, sizeof(ip_str));
-                ESP_LOGD(TAGS, "Gesendet an %s (%d bytes)", ip_str, len);
+                ESP_LOGD(TAGS, "Sent to %s (%d bytes)", ip_str, len);
             }
         }
 
