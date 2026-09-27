@@ -22,6 +22,7 @@ static const char *const TAG = "abus_helper";
 #include <cinttypes>
 typedef uint8_t byte;
 #include <cmath>
+#include <algorithm>
 
 // Primtable for CRC calculation
 const uint16_t ab_PrimTable[16] = {0x049D, 0x0C07, 0x1591, 0x1ACF, 0x1D4B, 0x202D, 0x2507, 0x2B4B,
@@ -518,6 +519,100 @@ void ab_setSocket(char *data, size_t datalen, ab_socket socket)
         ABUS_DBG_PRINTF(", f%d=%.1f", slotpos, socket.realdata[slotpos]);
         ab_setRealVal(data, datalen, pos, socket.realdata[slotpos]);
         pos += 4;
+        slotpos++;
+    }
+}
+
+// data type of a single socket tag
+enum ab_type : uint8_t
+{
+    AB_BIT = 0,
+    AB_INT = 1,
+    AB_LONG = 2,
+    AB_REAL = 3,
+};
+
+// a single socket tag with its data type, used for sockets with a free order of data types
+struct ab_value
+{
+    ab_type type = AB_BIT;
+    double value = 0.0; // double holds every int16, int32 and float value exactly
+};
+
+/**
+ * get the amount of bytes a data type needs in the data buffer
+ * @param type data type of the tag
+ * @return size in bytes
+ */
+uint8_t ab_getTypeSize(ab_type type)
+{
+    switch (type)
+    {
+    case AB_BIT:
+        return 1;
+    case AB_INT:
+        return 2;
+    case AB_LONG:
+    case AB_REAL:
+        return 4;
+    }
+    return 0;
+}
+
+/**
+ * get the amount of bytes a list of tags needs in the data buffer
+ * @param values list of tags
+ * @return size in bytes
+ */
+uint16_t ab_getValuesSize(const std::vector<ab_value> &values)
+{
+    uint16_t size = 0;
+    for (const ab_value &v : values)
+        size += ab_getTypeSize(v.type);
+    return size;
+}
+
+/**
+ * add all tags into the data buffer, in the order of the list
+ * @param data pointer to data buffer
+ * @param datalen maximum data buffer length
+ * @param values list of tags
+ */
+void ab_setValues(char *data, size_t datalen, const std::vector<ab_value> &values)
+{
+    uint16_t pos = 14;
+    uint8_t slotpos = 0;
+    for (const ab_value &v : values)
+    {
+        switch (v.type)
+        {
+        case AB_BIT:
+            ABUS_DBG_PRINTF(", b%d=%d", slotpos, v.value != 0.0);
+            ab_setBoolVal(data, datalen, pos, v.value != 0.0);
+            break;
+        case AB_INT:
+        {
+            int16_t val = (int16_t)std::lround(std::clamp(v.value, (double)INT16_MIN, (double)INT16_MAX));
+            ABUS_DBG_PRINTF(", i%d=%d", slotpos, val);
+            ab_setIntVal(data, datalen, pos, val);
+            break;
+        }
+        case AB_LONG:
+        {
+            int32_t val = (int32_t)std::llround(std::clamp(v.value, (double)INT32_MIN, (double)INT32_MAX));
+            ABUS_DBG_PRINTF(", l%d=%" PRId32, slotpos, val);
+            ab_setLongVal(data, datalen, pos, val);
+            break;
+        }
+        case AB_REAL:
+        {
+            float val = std::isnan(v.value) ? 0.0f : (float)v.value;
+            ABUS_DBG_PRINTF(", r%d=%.1f", slotpos, val);
+            ab_setRealVal(data, datalen, pos, val);
+            break;
+        }
+        }
+        pos += ab_getTypeSize(v.type);
         slotpos++;
     }
 }

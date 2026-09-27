@@ -44,19 +44,56 @@ async def to_code(config):
         )
 
 
+# Data types of a single socket tag
+ab_type = cg.global_ns.enum("ab_type")
+VALUE_TYPES = {
+    "bit": (ab_type.AB_BIT, cv.Any(cv.boolean, cv.int_range(min=0, max=1))),
+    "int": (ab_type.AB_INT, cv.int_range(min=-32768, max=32767)),
+    "long": (ab_type.AB_LONG, cv.int_range(min=-2147483648, max=2147483647)),
+    "real": (ab_type.AB_REAL, cv.float_),
+}
+
+# One entry of the `values` list, e.g. `- real: 21.5`
+VALUE_SCHEMA = cv.All(
+    cv.Schema(
+        {
+            cv.Optional(key): cv.templatable(validator)
+            for key, (_, validator) in VALUE_TYPES.items()
+        }
+    ),
+    cv.has_exactly_one_key(*VALUE_TYPES),
+)
+
+FIXED_ORDER_KEYS = ("bits", "ints", "longs", "reals")
+
+
+def validate_send_data(config):
+    if "values" in config and any(key in config for key in FIXED_ORDER_KEYS):
+        raise cv.Invalid(
+            "'values' cannot be combined with 'bits', 'ints', 'longs' or 'reals'"
+        )
+    return config
+
+
 # Action registration
 @automation.register_action(
     "abus_socket.send_data",
     abus_ns.class_("SendDataAction", automation.Action),
-    cv.Schema(
-        {
-            cv.Required(CONF_ID): cv.use_id(abus_socket),
-            cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
-            cv.Optional("bits"): cv.templatable(cv.ensure_list(cv.uint8_t)),
-            cv.Optional("ints"): cv.templatable(cv.ensure_list(cv.int_)),
-            cv.Optional("longs"): cv.templatable(cv.ensure_list(cv.int_)),
-            cv.Optional("reals"): cv.templatable(cv.ensure_list(cv.float_)),
-        }
+    cv.All(
+        cv.Schema(
+            {
+                cv.Required(CONF_ID): cv.use_id(abus_socket),
+                cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
+                cv.Optional("values"): cv.All(
+                    cv.ensure_list(VALUE_SCHEMA), cv.Length(min=1)
+                ),
+                cv.Optional("bits"): cv.templatable(cv.ensure_list(cv.uint8_t)),
+                cv.Optional("ints"): cv.templatable(cv.ensure_list(cv.int_)),
+                cv.Optional("longs"): cv.templatable(cv.ensure_list(cv.int_)),
+                cv.Optional("reals"): cv.templatable(cv.ensure_list(cv.float_)),
+            }
+        ),
+        validate_send_data,
     ),
     synchronous=True,
 )
@@ -89,5 +126,12 @@ async def abus_send_data_to_code(config, action_id, template_arg, args):
                 # IMPORTANT: explicit cast to std_vector for the C++ code
                 vector_data = cg.std_vector.template(cg_type)(value)
                 cg.add(getattr(rhs, f"set_{setter}_static")(vector_data))
+
+    # Typed tags, sent in list order
+    for entry in config.get("values", []):
+        ((key, value),) = entry.items()
+        if cg.is_template(value):
+            value = await cg.templatable(value, args, cg.double)
+        cg.add(rhs.add_value(VALUE_TYPES[key][0], value))
 
     return rhs

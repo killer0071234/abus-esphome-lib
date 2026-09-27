@@ -23,7 +23,6 @@ namespace abus_ns {
             uint16_t port = 8442;
             int sock_ = -1;
             ab_socket_config sock_cnf_rec;  // Socket config for receiving a socket
-            ab_socket send_storage_;
         public:
         void loop() override {
             // 1. Check whether WiFi is connected
@@ -150,46 +149,30 @@ namespace abus_ns {
             }
         }
 
-        // Setter for the action (called by SendDataAction)
-        void set_send_data(int id, const std::vector<uint8_t> &bits, 
-                        const std::vector<int16_t> &ints, 
-                        const std::vector<int32_t> &longs, 
-                        const std::vector<float> &reals) {
-            
-            send_storage_.config.socket_id = (uint8_t)id;
-            send_storage_.sender = 1234;
-            send_storage_.bitdata = bits;
-            send_storage_.intdata = ints;
-            send_storage_.longdata = longs;
-            send_storage_.realdata = reals;
-            send_storage_.socket_valid = true;
-
-        }
-
-        void play_send() {
-            if (!send_storage_.socket_valid) return;
-            // generate the header
+        // Build a socket packet from the tags (in list order) and broadcast it
+        void send_values(uint8_t socket_id, const std::vector<ab_value> &values) {
             ab_header header;
             header.dir = 1;
-            header.typ = send_storage_.config.socket_id;
-            header.from = send_storage_.sender;
+            header.typ = socket_id;
+            header.from = 1234;
             header.to = 0;
-            ESP_LOGD(TAGS, "socket.bitdata.size()=%d", send_storage_.bitdata.size());
-            ESP_LOGD(TAGS, "socket.intdata.size()=%d", send_storage_.intdata.size());
-            ESP_LOGD(TAGS, "socket.longdata.size()=%d", send_storage_.longdata.size());
-            ESP_LOGD(TAGS, "socket.realdata.size()=%d", send_storage_.realdata.size());
-            header.len = send_storage_.bitdata.size() + send_storage_.intdata.size() * 2 + send_storage_.longdata.size() * 4 + send_storage_.realdata.size() * 4 + 4;
+            header.len = ab_getValuesSize(values) + 4;
 
             // generate dataarray
             char sendbuf[128];
+            if (header.len + 14u >= sizeof(sendbuf)) {
+                ESP_LOGE(TAGS, "Socket %d is too large: %d bytes of data, maximum is %d", socket_id,
+                         header.len - 4, (int)sizeof(sendbuf) - 19);
+                return;
+            }
+            ESP_LOGD(TAGS, "Sending socket %d with %d values", socket_id, (int)values.size());
             ab_setHeader(sendbuf, sizeof(sendbuf), header);
             // set socket data into it
-            ab_setSocket(sendbuf, sizeof(sendbuf), send_storage_);
+            ab_setValues(sendbuf, sizeof(sendbuf), values);
             // Add checksum
             ab_setUIntVal(sendbuf, sizeof(sendbuf), header.len + 12, ab_calcCRC(sendbuf, header.len + 12));
             // Send out the data
             this->send_raw_data(sendbuf, header.len + 14);
-
         }
     };
 
@@ -211,19 +194,28 @@ class SendDataAction : public esphome::Action<Ts...> { // <-- make sure the esph
         void set_ints_static(const std::vector<int16_t> &v) { int_v_ = v; }
         void set_longs_static(const std::vector<int32_t> &v) { long_v_ = v; }
         void set_reals_static(const std::vector<float> &v) { real_v_ = v; }
+
+        // Typed tag for the `values` list (constant or lambda), sent in the order they are added
+        void add_value(ab_type type, esphome::TemplatableValue<double, Ts...> v) { values_.push_back({type, v}); }
+
         void play(const Ts &...x) override {
-            // 1. Extract all values from the templates
             int s_id = this->socket_id_v_.value(x...);
-            auto bits = this->bit_v_.value(x...);
-            auto ints = this->int_v_.value(x...);
-            auto longs = this->long_v_.value(x...);
-            auto reals = this->real_v_.value(x...);
+            std::vector<ab_value> values;
 
-            // 2. Write them into the component's central ab_socket storage
-            this->parent_->set_send_data(s_id, bits, ints, longs, reals);
+            if (!this->values_.empty()) {
+                // `values` list: evaluate every tag in its configured order
+                values.reserve(this->values_.size());
+                for (const auto &entry : this->values_)
+                    values.push_back({entry.first, entry.second.value(x...)});
+            } else {
+                // bits / ints / longs / reals: fixed order, all bits first, then ints, longs and reals
+                for (uint8_t v : this->bit_v_.value(x...)) values.push_back({AB_BIT, (double)v});
+                for (int16_t v : this->int_v_.value(x...)) values.push_back({AB_INT, (double)v});
+                for (int32_t v : this->long_v_.value(x...)) values.push_back({AB_LONG, (double)v});
+                for (float v : this->real_v_.value(x...)) values.push_back({AB_REAL, (double)v});
+            }
 
-            // 3. Trigger the send
-            this->parent_->play_send();
+            this->parent_->send_values((uint8_t)s_id, values);
         }
 
     protected:
@@ -233,6 +225,7 @@ class SendDataAction : public esphome::Action<Ts...> { // <-- make sure the esph
         esphome::TemplatableValue<std::vector<int16_t>, Ts...> int_v_{};
         esphome::TemplatableValue<std::vector<int32_t>, Ts...> long_v_{};
         esphome::TemplatableValue<std::vector<float>, Ts...> real_v_{};
+        std::vector<std::pair<ab_type, esphome::TemplatableValue<double, Ts...>>> values_;
     };
 
 }; // abus_ns

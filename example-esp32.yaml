@@ -200,6 +200,23 @@ button:
           longs: [0, 0]
           reals: [0.0, 0.0, 0.0]
 
+  # Free order of data types: the values are sent exactly in this order
+  - platform: template
+    name: "Send ABUS Mixed Data"
+    id: send_mixed_data
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 2
+          values:
+            - bit: !lambda return id(abus_output_1).state;
+            - real: !lambda return id(abus_setpoint_temp).state;
+            - bit: false
+            - int: 123
+            - int: -456
+            - long: 123456
+            - int: !lambda return millis() / 1000;
+
 # Automations
 interval:
   # Send cyclically every 30 seconds

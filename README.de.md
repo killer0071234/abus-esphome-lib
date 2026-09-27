@@ -9,7 +9,7 @@ Dies ist eine benutzerdefinierte [ESPHome](https://esphome.io/)-Komponente zur K
 ## Funktionen
 
 * **UDP-Kommunikation**: Lauscht auf Port 8442 und sendet UDP-Subnetz-Broadcasts (bzw. Fallback auf `255.255.255.255`).
-* **Strukturierte Daten**: Unterstützt das Senden und Konfigurieren von Empfangspuffern für `bits` (8-bit), `ints` (16-bit), `longs` (32-bit) und `reals` (Float).
+* **Strukturierte Daten**: Unterstützt das Senden und Konfigurieren von Empfangspuffern für `bits` (8-bit), `ints` (16-bit), `longs` (32-bit) und `reals` (Float). Beim Senden können die Datentypen in beliebiger Reihenfolge stehen.
 * **Automatische Header-Generierung**: Sendet automatisch korrekte `ab_header` inklusive Längenberechnung und CRC-Prüfsumme.
 * **ESPHome Actions**: Stellt die Aktion `abus_socket.send_data` für Automatisierungen bereit, inklusive Template-Unterstützung (Lambdas).
 
@@ -93,14 +93,44 @@ on_...:
 * **longs** (*Optional*, list[int32], templatable): Liste von 32-Bit Integer Werten.
 * **reals** (*Optional*, list[float], templatable): Liste von Float Werten.
 
+Mit `bits`, `ints`, `longs` und `reals` werden die Werte immer in einer festen Reihenfolge gesendet: zuerst alle Bits, dann alle Ints, Longs und Reals.
+
+#### Freie Reihenfolge der Datentypen (`values`)
+
+Erwartet die Gegenstelle die Datentypen in einer anderen Reihenfolge, verwenden Sie stattdessen `values`. Jeder Eintrag hat genau einen Typ (`bit`, `int`, `long` oder `real`), und die Werte werden genau in der Reihenfolge der Liste gesendet. Jeder Wert kann eine Konstante oder ein eigenes Lambda sein:
+
+```yaml
+on_...:
+  then:
+    - abus_socket.send_data:
+        id: my_abus_socket
+        socket_id: 2
+        values:            # Layout: [bit, real, bit, int, int, long, int]
+          - bit: true
+          - real: !lambda return id(my_temperature).state;
+          - bit: 0
+          - int: 123
+          - int: -456
+          - long: 123456
+          - int: !lambda return millis() / 1000;
+```
+
+* **values** (*Optional*, list): Typisierte Werte in Sende-Reihenfolge. Kann nicht mit `bits`, `ints`, `longs` oder `reals` kombiniert werden.
+  * **bit** (bool oder `0`/`1`, templatable): 1 Byte.
+  * **int** (int16, templatable): 2 Bytes. Lambda-Ergebnisse werden gerundet und auf −32768…32767 begrenzt.
+  * **long** (int32, templatable): 4 Bytes. Lambda-Ergebnisse werden gerundet und auf den int32-Bereich begrenzt.
+  * **real** (float, templatable): 4 Bytes. `NaN` wird als `0.0` gesendet.
+
+Ein Socket kann höchstens 109 Bytes Daten enthalten; größere Sockets werden nicht gesendet und ein Fehler wird geloggt.
+
 ## Abhängigkeiten
 
 Diese Komponente enthält alle benötigten Abhängigkeiten in der mitgelieferten Header-Datei [`abus_helper.h`](components/abus_socket/abus_helper.h). Diese stellt folgende wichtige Funktionen bereit:
 
 * **Paket-Validierung und -Parsing**: `ab_checkValidPacket`, `ab_getHeader`, `ab_getSocket`
-* **Paket-Erstellung**: `ab_setHeader`, `ab_setSocket`, `ab_calcCRC`
+* **Paket-Erstellung**: `ab_setHeader`, `ab_setSocket`, `ab_setValues`, `ab_calcCRC`
 * **Datentyp-Manipulation**: `ab_getBoolVal`, `ab_getIntVal`, `ab_getLongVal`, `ab_getRealVal`
-* **Socket-Strukturen**: `ab_header`, `ab_socket_config`, `ab_socket`
+* **Socket-Strukturen**: `ab_header`, `ab_socket_config`, `ab_socket`, `ab_value`
 
 Es sind keine zusätzlichen externen Abhängigkeiten erforderlich - alles was für die Cybro-3 Kommunikation benötigt wird, ist bereits enthalten.
 
