@@ -1,0 +1,21 @@
+# Labels applied to pull requests based on the files they change (actions/labeler)
+component:
+  - changed-files:
+      - any-glob-to-any-file: components/**
+
+example:
+  - changed-files:
+      - any-glob-to-any-file: example-*.yaml
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+
+devcontainer:
+  - changed-files:
+      - any-glob-to-any-file: .devcontainer/**
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: .github/**

@@ -1,0 +1,62 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+categories:
+  - title: "⚠️ Breaking Changes"
+    labels:
+      - breaking-change
+  - title: "🚀 Features"
+    labels:
+      - enhancement
+  - title: "🐛 Bug Fixes"
+    labels:
+      - bug
+  - title: "📝 Documentation"
+    labels:
+      - documentation
+  - title: "⬆️ Dependencies"
+    collapse-after: 5
+    labels:
+      - dependencies
+  - title: "🧰 Maintenance"
+    labels:
+      - ci
+      - devcontainer
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - breaking-change
+  minor:
+    labels:
+      - enhancement
+  patch:
+    labels:
+      - bug
+      - documentation
+      - dependencies
+  default: patch
+
+# Label pull requests from their title and branch name
+autolabeler:
+  - label: bug
+    branch:
+      - '/^fix[/-].+/'
+    title:
+      - '/^fix/i'
+  - label: enhancement
+    branch:
+      - '/^feat(ure)?[/-].+/'
+    title:
+      - '/^feat/i'
+  - label: breaking-change
+    title:
+      - '/^[a-z]+(\(.+\))?!:/i'
+
+template: |
+  ## Changes
+
+  $CHANGES
