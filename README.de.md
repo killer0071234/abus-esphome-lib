@@ -11,6 +11,7 @@ Dies ist eine benutzerdefinierte [ESPHome](https://esphome.io/)-Komponente zur K
 * **UDP-Kommunikation**: Lauscht auf Port 8442 und sendet UDP-Subnetz-Broadcasts (bzw. Fallback auf `255.255.255.255`).
 * **Strukturierte Daten**: Unterstützt das Senden und Konfigurieren von Empfangspuffern für `bits` (8-bit), `ints` (16-bit), `longs` (32-bit) und `reals` (Float).
 * **Automatische Header-Generierung**: Sendet automatisch korrekte `ab_header` inklusive Längenberechnung und CRC-Prüfsumme.
+* **Sockets empfangen**: Wertet eingehende Sockets mit der konfigurierten `socket_id` und Struktur aus und übergibt sie an `on_receive`-Automatisierungen. Eigene Broadcasts des Geräts werden ignoriert.
 * **ESPHome Actions**: Stellt die Aktion `abus_socket.send_data` für Automatisierungen bereit, inklusive Template-Unterstützung (Lambdas).
 
 ## Installation
@@ -49,23 +50,35 @@ abus_socket:
   id: my_abus_socket
   # Optional: Konfiguration für den Empfang von bestimmten Datentypen
   socket_receive:
-    socket_id: 1
-    num_bit: 8
-    num_int: 2
-    num_long: 1
-    num_real: 1
+    - socket_id: 1
+      num_bit: 8
+      num_int: 2
+      num_long: 1
+      num_real: 1
+      # Optional: wird für jeden gültig empfangenen Socket ausgeführt (x ist der empfangene Socket)
+      on_receive:
+        - lambda: |-
+            id(my_bit).publish_state(x.bitdata[0]);
+            id(my_int).publish_state(x.intdata[0]);
+            id(my_long).publish_state(x.longdata[0]);
+            id(my_real).publish_state(x.realdata[0]);
+    - socket_id: 2
+      num_real: 3
 ```
 
 > 📋 **Vollständiges Beispiel**: Eine umfassende Konfiguration mit Sensoren, Schaltern und Automatisierungen finden Sie in [`example-esp32.yaml`](example-esp32.yaml).
 
 ### Konfigurationsvariablen:
 * **id** (*Optional*, ID): Die ID für diese Komponente. Wird benötigt, um aus Automatisierungen (Actions) darauf zuzugreifen.
-* **socket_receive** (*Optional*):
-  * **socket_id** (*Erforderlich*, int, templatable): Die zu lauschende Socket-ID.
+* **socket_receive** (*Optional*, Liste): Die zu empfangenden Sockets, ein Eintrag pro Socket-ID:
+  * **socket_id** (*Erforderlich*, int, 1–255): Die zu lauschende Socket-ID. Jede ID darf nur einmal konfiguriert werden.
   * **num_bit** (*Optional*, int): Erwartete Anzahl der Bits/Bytes (Standard: 0).
   * **num_int** (*Optional*, int): Erwartete Anzahl der 16-Bit Integer (Standard: 0).
   * **num_long** (*Optional*, int): Erwartete Anzahl der 32-Bit Integer (Standard: 0).
   * **num_real** (*Optional*, int): Erwartete Anzahl der Floats (Standard: 0).
+  * **on_receive** (*Optional*, [Automation](https://esphome.io/automations/)): Aktionen, die ausgeführt werden, wenn ein Socket mit dieser `socket_id` und genau der konfigurierten Anzahl an Werten empfangen wird. In Lambdas ist `x` der empfangene `ab_socket` mit den Feldern `bitdata`, `intdata`, `longdata`, `realdata` (Vektoren in den konfigurierten Größen) und `sender` (ABUS-Adresse des Absenders). Pakete mit abweichender Länge werden als Fehler geloggt und verworfen.
+
+> ℹ️ **Reihenfolge der Werte**: Die Werte eines Sockets werden immer in derselben Reihenfolge übertragen: zuerst alle Bits, dann alle Ints, dann alle Longs, dann alle Reals. Das gilt auch dann, wenn die Datentypen in der Socket-Definition in der SPS gemischt angelegt sind. `x.intdata[0]` ist also immer der erste Int des Sockets, egal an welcher Stelle er in der SPS steht.
 
 ## Actions
 

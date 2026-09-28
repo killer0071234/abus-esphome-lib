@@ -22,8 +22,9 @@ namespace abus_ns {
         protected:
             uint16_t port = 8442;
             int sock_ = -1;
-            ab_socket_config sock_cnf_rec;  // Socket config for receiving a socket
+            std::vector<ab_socket_config> receive_configs_;  // Sockets this component listens for
             ab_socket send_storage_;
+            esphome::CallbackManager<void(const ab_socket &)> receive_callback_;
         public:
         void loop() override {
             // 1. Check whether WiFi is connected
@@ -47,6 +48,10 @@ namespace abus_ns {
                 socklen_t socklen = sizeof(source_addr);
                 int len = recvfrom(sock_, rx_buffer, sizeof(rx_buffer), 0, (struct sockaddr *)&source_addr, &socklen);
                 if (len > 0) {
+                    // Ignore our own broadcasts
+                    auto *source = (struct sockaddr_in *)&source_addr;
+                    if (source->sin_family == AF_INET && source->sin_addr.s_addr == this->get_own_address())
+                        return;
                     this->process_packet(rx_buffer, len);
                 }
             }
@@ -91,28 +96,51 @@ namespace abus_ns {
             }
         }
 
-        void set_socket_receive_config(uint8_t id, uint8_t num_bit, uint8_t num_int, uint8_t num_long, uint8_t num_real){
-            this->sock_cnf_rec.socket_id = id;
-            this->sock_cnf_rec.bitcount = num_bit;
-            this->sock_cnf_rec.intcount = num_int;
-            this->sock_cnf_rec.longcount = num_long;
-            this->sock_cnf_rec.realcount = num_real;
+        void add_socket_receive_config(uint8_t id, uint8_t num_bit, uint8_t num_int, uint8_t num_long, uint8_t num_real){
+            ab_socket_config cnf;
+            cnf.socket_id = id;
+            cnf.bitcount = num_bit;
+            cnf.intcount = num_int;
+            cnf.longcount = num_long;
+            cnf.realcount = num_real;
+            this->receive_configs_.push_back(cnf);
         }
 
+        // Register a callback for every valid socket received with one of the configured socket ids (used by on_receive)
+        template<typename F> void add_on_receive_callback(F &&callback) {
+            this->receive_callback_.add(std::forward<F>(callback));
+        }
 
         void process_packet(char* recbuf, size_t len) {
+            // Receiving is only active when socket_receive is configured
+            if (this->receive_configs_.empty())
+                return;
             if (ab_checkValidPacket(recbuf, len))
             {
                 ab_header header = ab_getHeader(recbuf, len);
-                // we got a socket message
-                if (header.dir == 1u && header.typ > 0u)
-                {
-                    //ESP_LOGD(TAGS, "<SOCK: ID: %3d: ", header.typ);
-
-                    ab_socket sock = ab_getSocket(recbuf, len, header, this->sock_cnf_rec);
-                    // TODO: here we need the code to parse the received data
+                // we only handle socket messages
+                if (header.dir != 1u || header.typ == 0u)
+                    return;
+                // look for the configuration of this socket id
+                for (const auto &cnf : this->receive_configs_) {
+                    if (cnf.socket_id != header.typ)
+                        continue;
+                    ab_socket sock = ab_getSocket(recbuf, len, header, cnf);
+                    if (sock.socket_valid)
+                        this->receive_callback_.call(sock);
+                    return;
                 }
             }
+        }
+
+        uint32_t get_own_address() {
+            esp_netif_ip_info_t ip_info;
+            esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+            if (netif == nullptr || esp_netif_get_ip_info(netif, &ip_info) != ESP_OK) {
+                return 0;
+            }
+            return ip_info.ip.addr;
         }
 
         uint32_t get_subnet_broadcast_address() {
@@ -191,6 +219,19 @@ namespace abus_ns {
             this->send_raw_data(sendbuf, header.len + 14);
 
         }
+    };
+
+class ReceiveTrigger : public esphome::Trigger<const ab_socket &> {
+    public:
+        ReceiveTrigger(abus_socket *parent, uint8_t socket_id) : socket_id_(socket_id) {
+            parent->add_on_receive_callback([this](const ab_socket &sock) {
+                if (sock.config.socket_id == this->socket_id_)
+                    this->trigger(sock);
+            });
+        }
+
+    protected:
+        uint8_t socket_id_;
     };
 
 template<typename... Ts> 

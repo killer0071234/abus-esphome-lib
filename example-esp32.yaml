@@ -9,7 +9,7 @@ esphome:
 esp32:
   board: nodemcu-32s
   framework:
-    type: arduino
+    type: esp-idf
 
 # WiFi configuration
 wifi:
@@ -54,13 +54,31 @@ external_components:
 # ABUS Socket configuration
 abus_socket:
   id: my_abus_socket
-  # Receive configuration
+  # Receive configuration: one entry per socket id
   socket_receive:
-    socket_id: 1
-    num_bit: 8    # receive 8 bits
-    num_int: 4    # receive 4 integers
-    num_long: 2   # receive 2 long values
-    num_real: 3   # receive 3 real values (floats)
+    - socket_id: 1
+      num_bit: 8    # receive 8 bits
+      num_int: 4    # receive 4 integers
+      num_long: 2   # receive 2 long values
+      num_real: 3   # receive 3 real values (floats)
+      # Publish the received values (x is the received socket)
+      on_receive:
+        - lambda: |-
+            id(abus_bit_0).publish_state(x.bitdata[0]);
+            id(abus_bit_1).publish_state(x.bitdata[1]);
+            id(abus_alarm).publish_state(x.bitdata[2]);
+            id(abus_status_ok).publish_state(x.bitdata[3]);
+            id(abus_int_1).publish_state(x.intdata[0]);
+            id(abus_int_2).publish_state(x.intdata[1]);
+            id(abus_long_1).publish_state(x.longdata[0]);
+            id(abus_temp).publish_state(x.realdata[0]);
+            id(abus_humidity).publish_state(x.realdata[1]);
+            id(abus_pressure).publish_state(x.realdata[2]);
+    - socket_id: 2
+      num_real: 1   # receive 1 real value (float)
+      on_receive:
+        - lambda: |-
+            id(abus_outdoor_temp).publish_state(x.realdata[0]);
 
 # Sensors for received data
 sensor:
@@ -105,6 +123,13 @@ sensor:
     accuracy_decimals: 2
     unit_of_measurement: "hPa"
     device_class: pressure
+
+  - platform: template
+    name: "ABUS Outdoor Temperature"
+    id: abus_outdoor_temp
+    accuracy_decimals: 1
+    unit_of_measurement: "°C"
+    device_class: temperature
 
 # Binary sensors for bit values
 binary_sensor:

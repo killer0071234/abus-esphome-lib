@@ -459,7 +459,6 @@ ab_socket ab_getSocket(char *data, size_t datalen, ab_header &header, uint8_t so
         retval.config.intcount = intcount;
         retval.config.longcount = longcount;
         retval.config.realcount = realcount;
-        retval.config.socket_id = sock_id;
         retval.socket_valid = true;
     }
     return retval;

@@ -11,6 +11,7 @@ This is a custom [ESPHome](https://esphome.io/) component for communicating with
 * **UDP communication**: Listens on port 8442 and sends UDP subnet broadcasts (falling back to `255.255.255.255`).
 * **Structured data**: Supports sending and configuring receive buffers for `bits` (8-bit), `ints` (16-bit), `longs` (32-bit) and `reals` (float).
 * **Automatic header generation**: Automatically sends a correct `ab_header`, including length calculation and CRC checksum.
+* **Receiving sockets**: Parses incoming sockets with the configured `socket_id` and layout and hands them to `on_receive` automations. The device's own broadcasts are ignored.
 * **ESPHome actions**: Provides the `abus_socket.send_data` action for automations, including template support (lambdas).
 
 ## Installation
@@ -49,23 +50,35 @@ abus_socket:
   id: my_abus_socket
   # Optional: configuration for receiving specific data types
   socket_receive:
-    socket_id: 1
-    num_bit: 8
-    num_int: 2
-    num_long: 1
-    num_real: 1
+    - socket_id: 1
+      num_bit: 8
+      num_int: 2
+      num_long: 1
+      num_real: 1
+      # Optional: runs for every valid socket received (x is the received socket)
+      on_receive:
+        - lambda: |-
+            id(my_bit).publish_state(x.bitdata[0]);
+            id(my_int).publish_state(x.intdata[0]);
+            id(my_long).publish_state(x.longdata[0]);
+            id(my_real).publish_state(x.realdata[0]);
+    - socket_id: 2
+      num_real: 3
 ```
 
 > 📋 **Full example**: A comprehensive configuration with sensors, switches and automations is available in [`example-esp32.yaml`](example-esp32.yaml).
 
 ### Configuration variables:
 * **id** (*Optional*, ID): The ID of this component. Required to access it from automations (actions).
-* **socket_receive** (*Optional*):
-  * **socket_id** (*Required*, int, templatable): The socket ID to listen on.
+* **socket_receive** (*Optional*, list): The sockets to receive, one entry per socket ID:
+  * **socket_id** (*Required*, int, 1–255): The socket ID to listen on. Each ID may only be configured once.
   * **num_bit** (*Optional*, int): Expected number of bits/bytes (default: 0).
   * **num_int** (*Optional*, int): Expected number of 16-bit integers (default: 0).
   * **num_long** (*Optional*, int): Expected number of 32-bit integers (default: 0).
   * **num_real** (*Optional*, int): Expected number of floats (default: 0).
+  * **on_receive** (*Optional*, [Automation](https://esphome.io/automations/)): Actions to run when a socket with this `socket_id` and exactly the configured number of values arrives. In lambdas, `x` is the received `ab_socket` with the fields `bitdata`, `intdata`, `longdata`, `realdata` (vectors in the configured sizes) and `sender` (the sender's ABUS address). Packets with a different length are logged as an error and dropped.
+
+> ℹ️ **Order of the values**: The values in a socket are always transferred in the same order: first all bits, then all ints, then all longs, then all reals. This applies even if the data types are mixed in the socket definition in the PLC. So `x.intdata[0]` is always the first int of the socket, no matter where it is placed in the PLC.
 
 ## Actions
 

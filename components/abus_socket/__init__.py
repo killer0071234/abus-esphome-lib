@@ -1,27 +1,47 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 import esphome.automation as automation
-from esphome.const import CONF_ID
+from esphome.const import CONF_ID, CONF_TRIGGER_ID
 
 # Existing definitions
 abus_ns = cg.esphome_ns.namespace("abus_ns")
 abus_socket = abus_ns.class_("abus_socket", cg.Component)
+ab_socket_const_ref = cg.global_ns.struct("ab_socket").operator("ref").operator("const")
+ReceiveTrigger = abus_ns.class_(
+    "ReceiveTrigger", automation.Trigger.template(ab_socket_const_ref)
+)
 
 # Helper schema for the sub-configurations
 SOCKET_STRUCT_SCHEMA = cv.Schema(
     {
-        cv.Required("socket_id"): cv.templatable(cv.int_range(min=1)),
-        cv.Optional("num_bit", default=0): cv.int_,
-        cv.Optional("num_int", default=0): cv.int_,
-        cv.Optional("num_long", default=0): cv.int_,
-        cv.Optional("num_real", default=0): cv.int_,
+        cv.Required("socket_id"): cv.int_range(min=1, max=255),
+        cv.Optional("num_bit", default=0): cv.uint8_t,
+        cv.Optional("num_int", default=0): cv.uint8_t,
+        cv.Optional("num_long", default=0): cv.uint8_t,
+        cv.Optional("num_real", default=0): cv.uint8_t,
+        cv.Optional("on_receive"): automation.validate_automation(
+            {
+                cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ReceiveTrigger),
+            }
+        ),
     }
 )
+
+
+def _validate_unique_socket_ids(sockets):
+    ids = [sock["socket_id"] for sock in sockets]
+    for socket_id in ids:
+        if ids.count(socket_id) > 1:
+            raise cv.Invalid(f"socket_id {socket_id} is configured more than once")
+    return sockets
+
 
 CONFIG_SCHEMA = cv.COMPONENT_SCHEMA.extend(
     {
         cv.GenerateID(): cv.declare_id(abus_socket),
-        cv.Optional("socket_receive"): SOCKET_STRUCT_SCHEMA,
+        cv.Optional("socket_receive"): cv.All(
+            cv.ensure_list(SOCKET_STRUCT_SCHEMA), _validate_unique_socket_ids
+        ),
     }
 )
 
@@ -31,10 +51,9 @@ async def to_code(config):
     await cg.register_component(var, config)
 
     # Pass the socket_receive values
-    if "socket_receive" in config:
-        recv_cfg = config["socket_receive"]
+    for recv_cfg in config.get("socket_receive", []):
         cg.add(
-            var.set_socket_receive_config(
+            var.add_socket_receive_config(
                 recv_cfg["socket_id"],
                 recv_cfg["num_bit"],
                 recv_cfg["num_int"],
@@ -42,6 +61,15 @@ async def to_code(config):
                 recv_cfg["num_real"],
             )
         )
+
+        # Automations for this socket (x = the received ab_socket)
+        for conf in recv_cfg.get("on_receive", []):
+            trigger = cg.new_Pvariable(
+                conf[CONF_TRIGGER_ID], var, recv_cfg["socket_id"]
+            )
+            await automation.build_automation(
+                trigger, [(ab_socket_const_ref, "x")], conf
+            )
 
 
 # Action registration
