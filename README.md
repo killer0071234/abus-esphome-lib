@@ -48,6 +48,8 @@ Add the `abus_socket` block to your YAML file to enable the component and define
 ```yaml
 abus_socket:
   id: my_abus_socket
+  # Optional: own A-bus address (default: last 3 bytes of the MAC)
+  # nad: 1234
   # Optional: configuration for receiving specific data types
   socket_receive:
     - socket_id: 1
@@ -70,6 +72,7 @@ abus_socket:
 
 ### Configuration variables:
 * **id** (*Optional*, ID): The ID of this component. Required to access it from automations (actions).
+* **nad** (*Optional*, int, 1–4294967295): The A-bus address (NAD) this device uses as the sender of outgoing sockets. Defaults to the last 3 bytes of the MAC address (e.g. MAC `…:12:34:56` → NAD `0x123456` = 1193046).
 * **socket_receive** (*Optional*, list): The sockets to receive, one entry per socket ID:
   * **socket_id** (*Required*, int, 1–255): The socket ID to listen on. Each ID may only be configured once.
   * **num_bit** (*Optional*, int, 0–100): Expected number of bits/bytes (default: 0).

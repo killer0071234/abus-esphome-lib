@@ -39,6 +39,7 @@ def _validate_unique_socket_ids(sockets):
 CONFIG_SCHEMA = cv.COMPONENT_SCHEMA.extend(
     {
         cv.GenerateID(): cv.declare_id(abus_socket),
+        cv.Optional("nad"): cv.int_range(min=1, max=0xFFFFFFFF),
         cv.Optional("socket_receive"): cv.All(
             cv.ensure_list(SOCKET_STRUCT_SCHEMA), _validate_unique_socket_ids
         ),
@@ -49,6 +50,10 @@ CONFIG_SCHEMA = cv.COMPONENT_SCHEMA.extend(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
+
+    # Own A-bus address; defaults to the last 3 bytes of the MAC at runtime
+    if "nad" in config:
+        cg.add(var.set_nad(config["nad"]))
 
     # Pass the socket_receive values
     for recv_cfg in config.get("socket_receive", []):

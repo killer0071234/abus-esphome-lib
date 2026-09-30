@@ -22,10 +22,24 @@ namespace abus_ns {
         protected:
             uint16_t port = 8442;
             int sock_ = -1;
+            uint32_t nad_ = 0;  // Own A-bus address (0 = derive from MAC in setup())
             std::vector<ab_socket_config> receive_configs_;  // Sockets this component listens for
             ab_socket send_storage_;
             esphome::CallbackManager<void(const ab_socket &)> receive_callback_;
         public:
+        void set_nad(uint32_t nad) { this->nad_ = nad; }
+        uint32_t get_nad() const { return this->nad_; }
+
+        void setup() override {
+            if (this->nad_ == 0) {
+                // Default: last 3 bytes of the MAC address
+                uint8_t mac[6];
+                esphome::get_mac_address_raw(mac);
+                this->nad_ = ((uint32_t) mac[3] << 16) | ((uint32_t) mac[4] << 8) | mac[5];
+            }
+            ESP_LOGCONFIG(TAGS, "A-bus NAD: %" PRIu32, this->nad_);
+        }
+
         void loop() override {
             // 1. Check whether WiFi is connected
             if (!esphome::network::is_connected()) {
@@ -185,7 +199,7 @@ namespace abus_ns {
                         const std::vector<float> &reals) {
             
             send_storage_.config.socket_id = (uint8_t)id;
-            send_storage_.sender = 1234;
+            send_storage_.sender = this->nad_;
             send_storage_.bitdata = bits;
             send_storage_.intdata = ints;
             send_storage_.longdata = longs;
