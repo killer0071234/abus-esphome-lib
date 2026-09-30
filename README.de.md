@@ -48,6 +48,8 @@ Füge den `abus_socket` Block zu deiner YAML-Datei hinzu, um die Komponente zu a
 ```yaml
 abus_socket:
   id: my_abus_socket
+  # Optional: eigene A-Bus-Adresse (Standard: letzte 3 Bytes der MAC)
+  # nad: 1234
   # Optional: Konfiguration für den Empfang von bestimmten Datentypen
   socket_receive:
     - socket_id: 1
@@ -70,6 +72,7 @@ abus_socket:
 
 ### Konfigurationsvariablen:
 * **id** (*Optional*, ID): Die ID für diese Komponente. Wird benötigt, um aus Automatisierungen (Actions) darauf zuzugreifen.
+* **nad** (*Optional*, int, 1–4294967295): Die A-Bus-Adresse (NAD), die dieses Gerät als Absender für gesendete Sockets verwendet. Standard: die letzten 3 Bytes der MAC-Adresse (z. B. MAC `…:12:34:56` → NAD `0x123456` = 1193046).
 * **socket_receive** (*Optional*, Liste): Die zu empfangenden Sockets, ein Eintrag pro Socket-ID:
   * **socket_id** (*Erforderlich*, int, 1–255): Die zu lauschende Socket-ID. Jede ID darf nur einmal konfiguriert werden.
   * **num_bit** (*Optional*, int, 0–100): Erwartete Anzahl der Bits/Bytes (Standard: 0).
