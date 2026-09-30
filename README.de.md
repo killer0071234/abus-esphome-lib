@@ -161,7 +161,7 @@ Die Beispieldatei verwendet Socket-ID 1 und zeigt alle verfügbaren Funktionen d
 | Befehl | Name | Argumente |
 |---|---|---|
 | 0 | `input_event` | Arg 0 = Eingangsnummer, Arg 1 = Ereignistyp (0 = kurz gedrückt, 1 = kurz losgelassen, 2 = lang gedrückt, 3 = lang losgelassen) |
-| 1 | `sync_enable` | |
+| 1 | `sync_enable` | Arg 0 = Aktiviert (0 = Inaktiv, 1 = Aktiv) |
 | 2 | `scene_request` | Arg 0 = Szenennummer, Arg 1 = Zustand (0 = aus, 1 = ein) |
 | 3 | `memory_request` | Arg 0 = Szenennummer |
 | 4 | `scene_status` | Arg 0 = Szenennummer, Arg 1 = Zustand (-1 = nicht definiert, 0 = aus, 1 = ein) |

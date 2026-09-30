@@ -161,7 +161,7 @@ The example file uses socket ID 1 and demonstrates all available features of the
 | Command | Name | Arguments |
 |---|---|---|
 | 0 | `input_event` | arg 0 = input number, arg 1 = event type (0 = short press, 1 = short release, 2 = long press, 3 = long release) |
-| 1 | `sync_enable` | |
+| 1 | `sync_enable` | arg 0 = enable (0 = disable, 1 = enable) |
 | 2 | `scene_request` | arg 0 = scene number, arg 1 = state (0 = off, 1 = on) |
 | 3 | `memory_request` | arg 0 = scene number |
 | 4 | `scene_status` | arg 0 = scene number, arg 1 = state (-1 = not defined, 0 = off, 1 = on) |
