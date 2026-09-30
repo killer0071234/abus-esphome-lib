@@ -57,4 +57,4 @@ esphome compile example-esp32.yaml   # full ESP-IDF build
 ## Docs and repo conventions
 
 - Documentation exists in two languages: [README.md](README.md) (English) and [README.de.md](README.de.md) (German). Update both together. Code comments and log messages are in English.
-- GitHub Actions only label PRs by path (`.github/labeler.yml`: `component`, `example`, `documentation`, `devcontainer`, `ci`) and draft releases (`release-drafter`, `v$RESOLVED_VERSION` tags; `enhancement` → minor, `breaking-change` → major, `bug`/`documentation`/`dependencies` → patch).
+- GitHub Actions label PRs by changed paths (`.github/labeler.yml`: `component`, `example`, `documentation`, `devcontainer`, `ci`) and by title or branch via Release Drafter (`bug`, `enhancement`, `breaking-change`). Release Drafter creates `v$RESOLVED_VERSION` drafts, with `enhancement` → minor, `breaking-change` → major, and `bug`/`documentation`/`dependencies` → patch.
