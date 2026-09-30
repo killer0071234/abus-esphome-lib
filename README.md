@@ -72,10 +72,10 @@ abus_socket:
 * **id** (*Optional*, ID): The ID of this component. Required to access it from automations (actions).
 * **socket_receive** (*Optional*, list): The sockets to receive, one entry per socket ID:
   * **socket_id** (*Required*, int, 1–255): The socket ID to listen on. Each ID may only be configured once.
-  * **num_bit** (*Optional*, int): Expected number of bits/bytes (default: 0).
-  * **num_int** (*Optional*, int): Expected number of 16-bit integers (default: 0).
-  * **num_long** (*Optional*, int): Expected number of 32-bit integers (default: 0).
-  * **num_real** (*Optional*, int): Expected number of floats (default: 0).
+  * **num_bit** (*Optional*, int, 0–100): Expected number of bits/bytes (default: 0).
+  * **num_int** (*Optional*, int, 0–100): Expected number of 16-bit integers (default: 0).
+  * **num_long** (*Optional*, int, 0–100): Expected number of 32-bit integers (default: 0).
+  * **num_real** (*Optional*, int, 0–100): Expected number of floats (default: 0).
   * **on_receive** (*Optional*, [Automation](https://esphome.io/automations/)): Actions to run when a socket with this `socket_id` and exactly the configured number of values arrives. In lambdas, `x` is the received `ab_socket` with the fields `bitdata`, `intdata`, `longdata`, `realdata` (vectors in the configured sizes) and `sender` (the sender's ABUS address). Packets with a different length are logged as an error and dropped.
 
 > ℹ️ **Order of the values**: The values in a socket are always transferred in the same order: first all bits, then all ints, then all longs, then all reals. This applies even if the data types are mixed in the socket definition in the PLC. So `x.intdata[0]` is always the first int of the socket, no matter where it is placed in the PLC.

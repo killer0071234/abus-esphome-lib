@@ -72,10 +72,10 @@ abus_socket:
 * **id** (*Optional*, ID): Die ID für diese Komponente. Wird benötigt, um aus Automatisierungen (Actions) darauf zuzugreifen.
 * **socket_receive** (*Optional*, Liste): Die zu empfangenden Sockets, ein Eintrag pro Socket-ID:
   * **socket_id** (*Erforderlich*, int, 1–255): Die zu lauschende Socket-ID. Jede ID darf nur einmal konfiguriert werden.
-  * **num_bit** (*Optional*, int): Erwartete Anzahl der Bits/Bytes (Standard: 0).
-  * **num_int** (*Optional*, int): Erwartete Anzahl der 16-Bit Integer (Standard: 0).
-  * **num_long** (*Optional*, int): Erwartete Anzahl der 32-Bit Integer (Standard: 0).
-  * **num_real** (*Optional*, int): Erwartete Anzahl der Floats (Standard: 0).
+  * **num_bit** (*Optional*, int, 0–100): Erwartete Anzahl der Bits/Bytes (Standard: 0).
+  * **num_int** (*Optional*, int, 0–100): Erwartete Anzahl der 16-Bit Integer (Standard: 0).
+  * **num_long** (*Optional*, int, 0–100): Erwartete Anzahl der 32-Bit Integer (Standard: 0).
+  * **num_real** (*Optional*, int, 0–100): Erwartete Anzahl der Floats (Standard: 0).
   * **on_receive** (*Optional*, [Automation](https://esphome.io/automations/)): Aktionen, die ausgeführt werden, wenn ein Socket mit dieser `socket_id` und genau der konfigurierten Anzahl an Werten empfangen wird. In Lambdas ist `x` der empfangene `ab_socket` mit den Feldern `bitdata`, `intdata`, `longdata`, `realdata` (Vektoren in den konfigurierten Größen) und `sender` (ABUS-Adresse des Absenders). Pakete mit abweichender Länge werden als Fehler geloggt und verworfen.
 
 > ℹ️ **Reihenfolge der Werte**: Die Werte eines Sockets werden immer in derselben Reihenfolge übertragen: zuerst alle Bits, dann alle Ints, dann alle Longs, dann alle Reals. Das gilt auch dann, wenn die Datentypen in der Socket-Definition in der SPS gemischt angelegt sind. `x.intdata[0]` ist also immer der erste Int des Sockets, egal an welcher Stelle er in der SPS steht.

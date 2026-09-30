@@ -15,10 +15,10 @@ ReceiveTrigger = abus_ns.class_(
 SOCKET_STRUCT_SCHEMA = cv.Schema(
     {
         cv.Required("socket_id"): cv.int_range(min=1, max=255),
-        cv.Optional("num_bit", default=0): cv.uint8_t,
-        cv.Optional("num_int", default=0): cv.uint8_t,
-        cv.Optional("num_long", default=0): cv.uint8_t,
-        cv.Optional("num_real", default=0): cv.uint8_t,
+        cv.Optional("num_bit", default=0): cv.int_range(min=0, max=100),
+        cv.Optional("num_int", default=0): cv.int_range(min=0, max=100),
+        cv.Optional("num_long", default=0): cv.int_range(min=0, max=100),
+        cv.Optional("num_real", default=0): cv.int_range(min=0, max=100),
         cv.Optional("on_receive"): automation.validate_automation(
             {
                 cv.GenerateID(CONF_TRIGGER_ID): cv.declare_id(ReceiveTrigger),
