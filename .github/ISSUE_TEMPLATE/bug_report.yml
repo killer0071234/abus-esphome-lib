@@ -1,0 +1,78 @@
+name: Bug report
+description: Report an error or unexpected behavior of the abus_socket component
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem! Please fill in as much as possible so the issue can be reproduced.
+        Remove secrets (WiFi passwords, API keys) from configuration and logs before posting.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Configure socket ...
+        2. Send ... from the PLC
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: esphome_version
+    attributes:
+      label: ESPHome version
+      placeholder: "e.g. 2026.9.0"
+    validations:
+      required: true
+
+  - type: input
+    id: component_version
+    attributes:
+      label: Component version / git ref
+      description: The `ref` used in `external_components` (e.g. `main`, `v1.2.0` or a commit hash).
+    validations:
+      required: true
+
+  - type: input
+    id: board
+    attributes:
+      label: Board
+      placeholder: "e.g. nodemcu-32s, esp32-c3-devkitm-1"
+
+  - type: input
+    id: plc
+    attributes:
+      label: PLC / controller
+      description: Controller type and firmware version, if relevant.
+      placeholder: "e.g. Cybro-3, HIQ-Home"
+
+  - type: textarea
+    id: config
+    attributes:
+      label: ESPHome configuration
+      description: The relevant part of your YAML (`abus_socket`, `send_data` actions, ...).
+      render: yaml
+
+  - type: textarea
+    id: plc_socket
+    attributes:
+      label: PLC socket definition
+      description: Socket ID and variables (name and type) as configured in the PLC, if the issue concerns a socket.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: "ESPHome log output (ideally with `logger: level: DEBUG`)."
+      render: text
