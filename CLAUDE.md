@@ -48,8 +48,8 @@ Total packet size is `len + 14`. Values always arrive grouped by type in the ord
 There are no unit tests or CI builds. Verification means compiling an ESPHome config with the ESPHome CLI, which the devcontainer (`esphome/esphome` image) provides:
 
 ```bash
-esphome config example-esp32.yaml    # validate schema/codegen only
-esphome compile example-esp32.yaml   # full ESP-IDF build
+esphome config example-esp32.yaml    # validate the configuration schema only
+esphome compile example-esp32.yaml   # run code generation and a full ESP-IDF build
 ```
 
 `example-esp32.yaml` pulls the component from **GitHub `main`**, not from the working tree. To test local changes, temporarily switch its `external_components` source to `type: local` with `path: components` (and don't commit that change). It also needs a `secrets.yaml` (git-ignored) with `wifi_ssid`, `wifi_password` and `api_encryption_key`. Build output goes to `.esphome/` (git-ignored).
