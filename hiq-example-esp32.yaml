@@ -1,0 +1,397 @@
+substitutions:
+  name: abus-hiq-example
+  friendly_name: "ABUS HIQ ESP32 Example"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+
+esp32:
+  board: nodemcu-32s
+  framework:
+    type: esp-idf
+
+# WiFi configuration
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Fallback hotspot
+  ap:
+    ssid: "${name} Fallback"
+    password: "12345678"
+
+captive_portal:
+
+# API for Home Assistant
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    # Uses the API encryption key
+    encryption:
+      key: !secret api_encryption_key
+
+# Logging
+logger:
+  level: DEBUG
+
+
+# External components for ABUS Socket
+external_components:
+  - source:
+      type: git
+      url: https://github.com/killer0071234/abus-esphome-lib
+      ref: main
+
+# ABUS Socket configuration
+abus_socket:
+  id: my_abus_socket
+  # Optional: own A-bus address used as sender (default: last 3 bytes of the MAC)
+  # nad: 1234
+  socket_receive:
+    # Socket 1: "HIQ-to-HIQ sync"
+    # PLC declaration order:
+    #   socket_req (bit), socket_from (long), socket_to (long),
+    #   socket_command (int), socket_argument_0..3 (int)
+    # On the wire the values are grouped by type (bits -> ints -> longs -> reals),
+    # so the indices below follow that order, not the declaration order.
+    # socket_command values:
+    #   0 = input_event, 1 = sync_enable, 2 = scene_request,
+    #   3 = memory_request, 4 = scene_status,
+    #   5 = presence_indicator (socket_argument_0: 0 = away, 1 = home)
+    - socket_id: 1
+      num_bit: 1    # socket_req
+      num_int: 5    # socket_command, socket_argument_0..3
+      num_long: 2   # socket_from, socket_to
+      on_receive:
+        - lambda: |-
+            id(hiq_socket_command).publish_state(x.intdata[0]);
+            switch (x.intdata[0]) {
+              case 0: {
+                id(hiq_socket_command_name).publish_state("input_event");
+                // socket_argument_0 = input number, socket_argument_1 = event type
+                static const char *const event_types[] = {"short_press", "short_release", "long_press", "long_release"};
+                int input = x.intdata[1];
+                int type = x.intdata[2];
+                const char *type_name = (type >= 0 && type <= 3) ? event_types[type] : "unknown";
+                id(hiq_input_event_number).publish_state(input);
+                id(hiq_input_event_text).publish_state("input " + std::to_string(input) + ": " + type_name);
+                if (type >= 0 && type <= 3) {
+                  id(hiq_input_event).trigger(type_name);
+                }
+                break;
+              }
+              case 1: id(hiq_socket_command_name).publish_state("sync_enable"); break;
+              case 2: id(hiq_socket_command_name).publish_state("scene_request"); break;
+              case 3: id(hiq_socket_command_name).publish_state("memory_request"); break;
+              case 4: id(hiq_socket_command_name).publish_state("scene_status"); break;
+              case 5:
+                id(hiq_socket_command_name).publish_state("presence_indicator");
+                // socket_argument_0: 0 = away, 1 = home
+                id(hiq_presence).publish_state(x.intdata[1] == 1);
+                // keep the switch in sync without sending again
+                id(hiq_presence_switch).publish_state(x.intdata[1] == 1);
+                break;
+              default: id(hiq_socket_command_name).publish_state("unknown"); break;
+            }
+            id(hiq_socket_argument_0).publish_state(x.intdata[1]);
+            id(hiq_socket_argument_1).publish_state(x.intdata[2]);
+            id(hiq_socket_argument_2).publish_state(x.intdata[3]);
+            id(hiq_socket_argument_3).publish_state(x.intdata[4]);
+            id(hiq_socket_from).publish_state(x.longdata[0]);
+            id(hiq_socket_to).publish_state(x.longdata[1]);
+
+# Sensors for received HIQ-to-HIQ sync data
+sensor:
+  - platform: template
+    name: "HIQ Socket From"
+    id: hiq_socket_from
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket To"
+    id: hiq_socket_to
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket Command"
+    id: hiq_socket_command
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket Argument 0"
+    id: hiq_socket_argument_0
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket Argument 1"
+    id: hiq_socket_argument_1
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket Argument 2"
+    id: hiq_socket_argument_2
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "HIQ Socket Argument 3"
+    id: hiq_socket_argument_3
+    accuracy_decimals: 0
+
+  # Updated by command 0 (input_event): input number of the last received event
+  - platform: template
+    name: "HIQ Input Event Number"
+    id: hiq_input_event_number
+    accuracy_decimals: 0
+
+text_sensor:
+  - platform: template
+    name: "HIQ Socket Command Name"
+    id: hiq_socket_command_name
+
+  # Updated by command 0 (input_event), e.g. "input 3: long_press"
+  - platform: template
+    name: "HIQ Input Event"
+    id: hiq_input_event_text
+
+# Fired by command 0 (input_event); the input number is in "HIQ Input Event Number"
+event:
+  - platform: template
+    name: "HIQ Input Event Type"
+    id: hiq_input_event
+    event_types:
+      - short_press
+      - short_release
+      - long_press
+      - long_release
+
+binary_sensor:
+  # Updated by command 5 (presence_indicator): on = home, off = away
+  - platform: template
+    name: "HIQ Presence"
+    id: hiq_presence
+    device_class: presence
+
+# Send a presence signal on socket 1 (same layout as the receive socket):
+#   bits:  [socket_req]
+#   ints:  [socket_command = 5 (presence_indicator), socket_argument_0..3]
+#   longs: [socket_from = own NAD, socket_to]
+switch:
+  - platform: template
+    name: "HIQ Presence Signal"
+    id: hiq_presence_switch
+    optimistic: true
+    turn_on_action:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: [5, 1, 0, 0, 0]  # presence_indicator, argument_0 = 1 (home)
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+    turn_off_action:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: [5, 0, 0, 0, 0]  # presence_indicator, argument_0 = 0 (away)
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+# Scene request (socket_command = 2):
+#   socket_argument_0 = scene number, socket_argument_1 = state (1 = on, 0 = off)
+number:
+  - platform: template
+    name: "HIQ Scene Number"
+    id: hiq_scene_number
+    min_value: 0
+    max_value: 31
+    step: 1
+    initial_value: 0
+    optimistic: true
+    mode: box
+
+  # Input event (socket_command = 0):
+  #   socket_argument_0 = input number,
+  #   socket_argument_1 = event type (0 = short press, 1 = short release,
+  #                                   2 = long press, 3 = long release)
+  - platform: template
+    name: "HIQ Input Number"
+    id: hiq_input_number
+    min_value: 0
+    max_value: 255
+    step: 1
+    initial_value: 0
+    optimistic: true
+    mode: box
+
+select:
+  # Scene state sent with scene_status (socket_argument_1).
+  # Keep the option order: the sent value is the option index - 1.
+  - platform: template
+    name: "HIQ Scene Status"
+    id: hiq_scene_state
+    options:
+      - "not defined"  # -1
+      - "off"          #  0
+      - "on"           #  1
+    initial_option: "not defined"
+    optimistic: true
+
+button:
+  - platform: template
+    name: "HIQ Send Scene On"
+    id: hiq_scene_on
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // scene_request, argument_0 = scene number, argument_1 = 1 (on)
+            return {2, (int16_t) id(hiq_scene_number).state, 1, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Scene Off"
+    id: hiq_scene_off
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // scene_request, argument_0 = scene number, argument_1 = 0 (off)
+            return {2, (int16_t) id(hiq_scene_number).state, 0, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Scene Memory"
+    id: hiq_scene_memory
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // memory_request, argument_0 = scene number
+            return {3, (int16_t) id(hiq_scene_number).state, 0, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Scene Status"
+    id: hiq_scene_status
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // scene_status, argument_0 = scene number,
+            // argument_1 = state (-1 = not defined, 0 = off, 1 = on)
+            int16_t state = (int16_t) id(hiq_scene_state).active_index().value_or(0) - 1;
+            return {4, (int16_t) id(hiq_scene_number).state, state, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Scene Sync Enable"
+    id: hiq_scene_sync_enable
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // status_request, argument_0 = scene number
+            return {1, (int16_t) id(hiq_scene_number).state, 1, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Scene Sync Disable"
+    id: hiq_scene_sync_disable
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // status_request, argument_0 = scene number
+            return {1, (int16_t) id(hiq_scene_number).state, 0, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Input Short Press"
+    id: hiq_input_short_press
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // input_event, argument_0 = input number, argument_1 = 0 (short_press)
+            return {0, (int16_t) id(hiq_input_number).state, 0, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Input Short Release"
+    id: hiq_input_short_release
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // input_event, argument_0 = input number, argument_1 = 1 (short_release)
+            return {0, (int16_t) id(hiq_input_number).state, 1, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Input Long Press"
+    id: hiq_input_long_press
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // input_event, argument_0 = input number, argument_1 = 2 (long_press)
+            return {0, (int16_t) id(hiq_input_number).state, 2, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
+
+  - platform: template
+    name: "HIQ Send Input Long Release"
+    id: hiq_input_long_release
+    on_press:
+      - abus_socket.send_data:
+          id: my_abus_socket
+          socket_id: 1
+          bits: [1]
+          ints: !lambda |-
+            // input_event, argument_0 = input number, argument_1 = 3 (long_release)
+            return {0, (int16_t) id(hiq_input_number).state, 3, 0, 0};
+          longs: !lambda |-
+            // socket_from = own NAD, socket_to = 0 (all)
+            return {(int32_t) id(my_abus_socket).get_nad(), 0};
