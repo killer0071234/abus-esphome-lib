@@ -152,6 +152,30 @@ A complete example configuration is available in [`example-esp32.yaml`](example-
 
 The example file uses socket ID 1 and demonstrates all available features of the component.
 
+## HIQ-Home template
+
+[`hiq-example-esp32.yaml`](hiq-example-esp32.yaml) is a ready-made template for talking to a HIQ-Home controller. It uses the controller's "HIQ-to-HIQ sync" socket (socket ID 1: `socket_req` bit, `socket_from`/`socket_to` longs, `socket_command` and `socket_argument_0..3` ints), both to receive from and to send to the controller.
+
+`socket_command` selects the message type:
+
+| Command | Name | Arguments |
+|---|---|---|
+| 0 | `input_event` | arg 0 = input number, arg 1 = event type (0 = short press, 1 = short release, 2 = long press, 3 = long release) |
+| 1 | `sync_enable` | |
+| 2 | `scene_request` | arg 0 = scene number, arg 1 = state (0 = off, 1 = on) |
+| 3 | `memory_request` | arg 0 = scene number |
+| 4 | `scene_status` | arg 0 = scene number, arg 1 = state (-1 = not defined, 0 = off, 1 = on) |
+| 5 | `presence_indicator` | arg 0 = presence (0 = away, 1 = home) |
+
+The template provides:
+
+* **Receive**: sensors for all socket values, the command name, a presence binary sensor (home/away) and an input event entity that fires `short_press`, `short_release`, `long_press` or `long_release` for Home Assistant automations
+* **Send**: a presence switch (kept in sync with presence received from the controller), scene on/off, memory, status and sync buttons, and input event buttons
+* Outgoing messages use the device's own A-bus address (`nad`) as `socket_from` and `0` (all) as `socket_to`
+* The ESPHome web interface at `http://<device-ip>/`
+
+Setup is the same as for the example file above (copy it together with `secrets.yaml`, then compile and flash).
+
 ## Repository
 
 This project is available on GitHub: [https://github.com/killer0071234/abus-esphome-lib](https://github.com/killer0071234/abus-esphome-lib)

@@ -152,6 +152,30 @@ Eine vollständige Beispielkonfiguration finden Sie in [`example-esp32.yaml`](ex
 
 Die Beispieldatei verwendet Socket-ID 1 und zeigt alle verfügbaren Funktionen der Komponente.
 
+## HIQ-Home-Vorlage
+
+[`hiq-example-esp32.yaml`](hiq-example-esp32.yaml) ist eine fertige Vorlage für die Kommunikation mit einem HIQ-Home-Controller. Sie verwendet den Socket „HIQ-to-HIQ sync“ des Controllers (Socket-ID 1: Bit `socket_req`, Longs `socket_from`/`socket_to`, Ints `socket_command` und `socket_argument_0..3`) sowohl zum Empfangen vom als auch zum Senden an den Controller.
+
+`socket_command` legt den Nachrichtentyp fest:
+
+| Befehl | Name | Argumente |
+|---|---|---|
+| 0 | `input_event` | Arg 0 = Eingangsnummer, Arg 1 = Ereignistyp (0 = kurz gedrückt, 1 = kurz losgelassen, 2 = lang gedrückt, 3 = lang losgelassen) |
+| 1 | `sync_enable` | |
+| 2 | `scene_request` | Arg 0 = Szenennummer, Arg 1 = Zustand (0 = aus, 1 = ein) |
+| 3 | `memory_request` | Arg 0 = Szenennummer |
+| 4 | `scene_status` | Arg 0 = Szenennummer, Arg 1 = Zustand (-1 = nicht definiert, 0 = aus, 1 = ein) |
+| 5 | `presence_indicator` | Arg 0 = Anwesenheit (0 = abwesend, 1 = zuhause) |
+
+Die Vorlage bietet:
+
+* **Empfangen**: Sensoren für alle Socket-Werte, den Befehlsnamen, einen Anwesenheits-Binärsensor (zuhause/abwesend) und eine Event-Entität, die `short_press`, `short_release`, `long_press` oder `long_release` für Home-Assistant-Automatisierungen auslöst
+* **Senden**: einen Anwesenheitsschalter (wird mit der vom Controller empfangenen Anwesenheit synchronisiert), Buttons für Szene ein/aus, Memory, Status und Sync sowie Buttons für Eingangsereignisse
+* Ausgehende Nachrichten verwenden die eigene A-Bus-Adresse des Geräts (`nad`) als `socket_from` und `0` (alle) als `socket_to`
+* Die ESPHome-Weboberfläche unter `http://<Geräte-IP>/`
+
+Die Einrichtung erfolgt wie bei der Beispieldatei oben (zusammen mit `secrets.yaml` kopieren, dann kompilieren und flashen).
+
 ## Repository
 
 Dieses Projekt ist auf GitHub verfügbar: [https://github.com/killer0071234/abus-esphome-lib](https://github.com/killer0071234/abus-esphome-lib)
