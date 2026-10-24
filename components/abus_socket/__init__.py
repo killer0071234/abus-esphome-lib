@@ -51,7 +51,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
 
-    # Own A-bus address; defaults to the last 3 bytes of the MAC at runtime
+    # Own A-bus address; defaults to the last 4 bytes of the MAC at runtime
     if "nad" in config:
         cg.add(var.set_nad(config["nad"]))
 

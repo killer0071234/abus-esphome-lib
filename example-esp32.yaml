@@ -54,7 +54,7 @@ external_components:
 # ABUS Socket configuration
 abus_socket:
   id: my_abus_socket
-  # Optional: own A-bus address used as sender (default: last 3 bytes of the MAC)
+  # Optional: own A-bus address used as sender (default: last 4 bytes of the MAC)
   # nad: 1234
   # Receive configuration: one entry per socket id
   socket_receive:
