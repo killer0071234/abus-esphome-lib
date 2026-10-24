@@ -38,7 +38,7 @@ Total packet size is `len + 14`. Values always arrive grouped by type in the ord
 - Everything in the two headers is defined (not just declared) in headers, including non-`inline` functions and global unions (`ab_real`, `ab_int`, ...). This works only because a single translation unit includes them. Adding another `.cpp` that includes `abus_helper.h` will cause duplicate-symbol link errors unless you mark them `inline`.
 - Receive and send buffers are both fixed at 128 bytes (`rx_buffer` in `loop()`, `sendbuf` in `play_send()`). The receive payload is limited to 110 bytes; the current sender is safely limited to 109 bytes because `ab_setHeader` uses a strict `>` size check. The YAML schema allows up to 100 of each type, which can exceed those limits. `ab_setSocket` does not bounds-check bits.
 - `loop()` reads at most one datagram per iteration.
-- The outgoing sender address is the `nad` option (`nad_`), defaulting to the last 3 bytes of the MAC in `setup()`; `to` is always 0 (broadcast).
+- The outgoing sender address is the `nad` option (`nad_`), defaulting to the last 4 bytes of the MAC in `setup()`; `to` is always 0 (broadcast).
 - Log tags: the component uses `TAGS = "abus"`; the helper uses `TAG = "abus_helper"`.
 - A `socket_receive` entry with `on_receive` adds a callback; `process_packet` returns early when no `socket_receive` is configured.
 - When you add YAML options, keep the Python schema, the C++ setters, `to_code` and both READMEs in sync.

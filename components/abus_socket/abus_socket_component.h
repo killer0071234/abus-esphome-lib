@@ -32,10 +32,10 @@ namespace abus_ns {
 
         void setup() override {
             if (this->nad_ == 0) {
-                // Default: last 3 bytes of the MAC address
+                // Default: last 4 bytes of the MAC address (e.g. ..:AB:12:34:56 -> 0xAB123456)
                 uint8_t mac[6];
                 esphome::get_mac_address_raw(mac);
-                this->nad_ = ((uint32_t) mac[3] << 16) | ((uint32_t) mac[4] << 8) | mac[5];
+                this->nad_ = ((uint32_t) mac[2] << 24) | ((uint32_t) mac[3] << 16) | ((uint32_t) mac[4] << 8) | mac[5];
             }
             ESP_LOGCONFIG(TAGS, "A-bus NAD: %" PRIu32, this->nad_);
         }
