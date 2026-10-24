@@ -220,10 +220,16 @@ namespace abus_ns {
             ESP_LOGD(TAGS, "socket.intdata.size()=%d", send_storage_.intdata.size());
             ESP_LOGD(TAGS, "socket.longdata.size()=%d", send_storage_.longdata.size());
             ESP_LOGD(TAGS, "socket.realdata.size()=%d", send_storage_.realdata.size());
-            header.len = send_storage_.bitdata.size() + send_storage_.intdata.size() * 2 + send_storage_.longdata.size() * 4 + send_storage_.realdata.size() * 4 + 4;
+            size_t datalen = send_storage_.bitdata.size() + send_storage_.intdata.size() * 2 + send_storage_.longdata.size() * 4 + send_storage_.realdata.size() * 4 + 4;
 
             // generate dataarray
             char sendbuf[128];
+            if (datalen + 14 > sizeof(sendbuf)) {
+                ESP_LOGE(TAGS, "Socket %d is too large: %d bytes of data, maximum is %d", header.typ,
+                         (int)(datalen - 4), (int)sizeof(sendbuf) - 18);
+                return;
+            }
+            header.len = datalen;
             ab_setHeader(sendbuf, sizeof(sendbuf), header);
             // set socket data into it
             ab_setSocket(sendbuf, sizeof(sendbuf), send_storage_);
